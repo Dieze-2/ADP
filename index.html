@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Générateur de rapport d'audit</title>
     <link rel="stylesheet" href="css/style.css">
 
@@ -19,78 +19,108 @@
 </head>
 <body>
     <header class="appbar">
-        <span class="appbar__title">Rapports d'audit</span>
+        <div class="brand">
+            <span class="app-icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l2 2 4-4"/><rect x="4" y="3" width="16" height="18" rx="4"/></svg>
+            </span>
+            <span class="brand__text"><strong>Rapports d'audit</strong><span>Générateur</span></span>
+        </div>
 
-        <nav class="stepper" aria-label="Étapes">
-            <button type="button" class="tab-btn step active is-current" data-tab="upload" aria-current="step">
-                <span class="step__dot" aria-hidden="true"><span class="step__num">1</span><svg class="step__check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
-                <span class="step__label">Import</span>
-            </button>
-            <span class="step__sep" aria-hidden="true"></span>
-            <button type="button" class="tab-btn step" data-tab="edit">
-                <span class="step__dot" aria-hidden="true"><span class="step__num">2</span><svg class="step__check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
-                <span class="step__label">Édition</span>
-            </button>
-            <span class="step__sep" aria-hidden="true"></span>
-            <button type="button" class="tab-btn step" data-tab="preview">
-                <span class="step__dot" aria-hidden="true"><span class="step__num">3</span></span>
-                <span class="step__label">Aperçu</span>
-            </button>
+        <nav class="segmented glass" role="tablist" aria-label="Étapes du rapport" data-current="upload">
+            <span class="segmented__thumb" aria-hidden="true"></span>
+            <button type="button" class="tab-btn segmented__btn active" role="tab" id="tabbtn-upload" aria-controls="tab-upload" aria-selected="true" data-tab="upload"><span class="segmented__dot" aria-hidden="true"></span>Import</button>
+            <button type="button" class="tab-btn segmented__btn" role="tab" id="tabbtn-edit" aria-controls="tab-edit" aria-selected="false" tabindex="-1" data-tab="edit"><span class="segmented__dot" aria-hidden="true"></span>Édition</button>
+            <button type="button" class="tab-btn segmented__btn" role="tab" id="tabbtn-preview" aria-controls="tab-preview" aria-selected="false" tabindex="-1" data-tab="preview"><span class="segmented__dot" aria-hidden="true"></span>Aperçu</button>
         </nav>
 
-        <button type="button" id="themeToggle" class="icon-btn" aria-label="Basculer entre thème clair et sombre">
-            <svg class="theme-icon theme-icon--moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
-            <svg class="theme-icon theme-icon--sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-        </button>
+        <div class="appbar__end">
+            <button type="button" id="themeToggle" class="icon-btn glass" aria-label="Basculer entre thème clair et sombre">
+                <svg class="theme-icon theme-icon--moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+                <svg class="theme-icon theme-icon--sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+            </button>
+        </div>
     </header>
 
     <main class="page">
         <!-- =====================================================
              ÉTAPE 1 : IMPORT
              ===================================================== -->
-        <section id="tab-upload" class="tab-content active">
-            <div class="page-head">
-                <h1 class="page-title">Importer un rapport</h1>
-                <p class="page-subtitle">Word (.docx), rapport HTML existant ou données JSON. Les photos sont optimisées automatiquement.</p>
-            </div>
+        <section id="tab-upload" class="tab-content active" role="tabpanel" aria-labelledby="tabbtn-upload">
+            <div class="bento">
+                <div class="card card--lg glass span-8 row-2">
+                    <p class="eyebrow">Étape 1 sur 3</p>
+                    <h1 class="large-title">Importer un rapport</h1>
+                    <p class="lede">Le compte rendu Word, un rapport HTML déjà généré ou un fichier JSON. Écarts, observations et photos sont extraits pour vous.</p>
 
-            <div class="drop-zone" id="uploadArea">
-                <div class="drop-zone__idle">
-                    <svg class="drop-zone__icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>
-                    <p class="drop-zone__title">Déposez un fichier ici</p>
-                    <p class="drop-zone__or">ou</p>
-                    <button type="button" class="btn btn--primary" id="pickFile">Choisir un fichier</button>
-                    <ul class="chips" aria-label="Formats acceptés">
-                        <li class="chip">.docx</li>
-                        <li class="chip">.html</li>
-                        <li class="chip">.json</li>
+                    <div class="drop-zone" id="uploadArea">
+                        <div class="drop-zone__idle">
+                            <span class="drop-zone__icon" aria-hidden="true">
+                                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M20 15v3a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-3"/></svg>
+                            </span>
+                            <div class="drop-zone__text">
+                                <p class="drop-zone__title">Glissez un fichier ici</p>
+                                <ul class="chips" aria-label="Formats acceptés">
+                                    <li class="chip">.docx</li>
+                                    <li class="chip">.html</li>
+                                    <li class="chip">.json</li>
+                                </ul>
+                            </div>
+                            <button type="button" class="btn btn--primary" id="pickFile">Choisir un fichier</button>
+                        </div>
+
+                        <div id="progressSection" class="drop-zone__progress" style="display: none;">
+                            <p id="progressText" class="progress-text">Initialisation…</p>
+                            <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+                        </div>
+
+                        <input type="file" id="fileInput" accept=".docx,.html,.htm,.json" hidden>
+                    </div>
+
+                    <div id="errorSection" class="alert alert--danger" role="alert" style="display: none;">
+                        <p id="errorMessage" class="alert__text"></p>
+                        <button type="button" id="retryBtn" class="btn btn--secondary btn--sm">Réessayer</button>
+                    </div>
+                </div>
+
+                <div class="card glass lift span-4">
+                    <p class="eyebrow">Sans fichier</p>
+                    <h2 class="title-2">Nouveau rapport</h2>
+                    <p class="caption">Partez d'un formulaire vierge, prérempli avec l'objectif habituel.</p>
+                    <button type="button" class="btn btn--secondary btn--sm" id="startBlank">Commencer</button>
+                </div>
+
+                <div class="card glass lift span-4">
+                    <p class="eyebrow">Photos</p>
+                    <p class="figure">1 600 <span class="figure__unit">px</span></p>
+                    <p class="caption">Redimensionnées et recompressées à l'import, doublons écartés. Les captures d'écran restent nettes.</p>
+                </div>
+
+                <div class="card glass span-6">
+                    <h2 class="title-2">Formats acceptés</h2>
+                    <ul class="list-rows">
+                        <li><span class="chip">.docx</span>Compte rendu Word : métadonnées, écarts, photos</li>
+                        <li><span class="chip">.html</span>Rapport généré, notes de réunion comprises</li>
+                        <li><span class="chip">.json</span>Données exportées depuis l'outil</li>
                     </ul>
                 </div>
 
-                <div id="progressSection" class="drop-zone__progress" style="display: none;">
-                    <p id="progressText" class="progress-text">Initialisation…</p>
-                    <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+                <div class="card glass span-6">
+                    <h2 class="title-2">Traitement local</h2>
+                    <p class="caption caption--lg">Tout reste sur ce poste : aucun fichier n'est envoyé sur un serveur, et l'outil fonctionne hors connexion.</p>
                 </div>
-
-                <input type="file" id="fileInput" accept=".docx,.html,.htm,.json" hidden>
             </div>
-
-            <div id="errorSection" class="alert alert--danger" role="alert" style="display: none;">
-                <p id="errorMessage" class="alert__text"></p>
-                <button type="button" id="retryBtn" class="btn btn--secondary btn--sm">Réessayer</button>
-            </div>
-
-            <p class="page-alt">Pas de fichier ? <button type="button" class="link-btn" id="startBlank">Créer un rapport vide</button></p>
         </section>
 
         <!-- =====================================================
              ÉTAPE 2 : ÉDITION
              ===================================================== -->
-        <section id="tab-edit" class="tab-content">
-            <div class="empty-state" id="editEmpty">
-                <svg class="empty-state__icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6M9 15h6"/></svg>
-                <h1 class="page-title">Aucun rapport en cours</h1>
-                <p class="page-subtitle">Importez un fichier ou partez d'un rapport vide.</p>
+        <section id="tab-edit" class="tab-content" role="tabpanel" aria-labelledby="tabbtn-edit">
+            <div class="empty-state card card--lg glass" id="editEmpty">
+                <span class="empty-state__icon" aria-hidden="true">
+                    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6M9 15h6"/></svg>
+                </span>
+                <h1 class="large-title">Aucun rapport en cours</h1>
+                <p class="lede">Importez un fichier ou partez d'un rapport vide.</p>
                 <div class="empty-state__actions">
                     <button type="button" id="createFromScratch" class="btn btn--primary">Nouveau rapport vide</button>
                     <button type="button" id="loadFromJsonFile" class="btn btn--secondary">Ouvrir un fichier JSON</button>
@@ -98,9 +128,18 @@
                 </div>
             </div>
 
-            <form id="auditForm" class="edit-layout" hidden novalidate>
-                <nav class="section-nav" aria-label="Sections du rapport">
+            <form id="auditForm" class="bento edit-layout" hidden novalidate>
+                <header class="card card--lg glass synthesis span-6" aria-label="Synthèse du rapport">
+                    <p class="eyebrow" id="synthMeta">Audit</p>
+                    <p class="synthesis__title" id="synthTitle">Sans titre</p>
+                </header>
+                <div class="card glass lift stat span-2"><span class="stat__label"><i class="dot dot--pf" aria-hidden="true"></i>Points forts</span><span class="stat__value" data-count="pointfort">0</span></div>
+                <div class="card glass lift stat span-2"><span class="stat__label"><i class="dot dot--ecart" aria-hidden="true"></i>Écarts</span><span class="stat__value" data-count="ecart">0</span></div>
+                <div class="card glass lift stat span-2"><span class="stat__label"><i class="dot dot--obs" aria-hidden="true"></i>Observations</span><span class="stat__value" data-count="observation">0</span></div>
+
+                <nav class="section-nav glass span-3" aria-label="Sections du rapport">
                     <a href="#sec-infos">Informations</a>
+                    <a href="#sec-assistant">Assistant <span class="count" id="tipsCount">0</span></a>
                     <a href="#sec-pointsforts">Points forts <span class="count" data-count="pointfort">0</span></a>
                     <a href="#sec-ecarts">Écarts <span class="count" data-count="ecart">0</span></a>
                     <a href="#sec-observations">Observations <span class="count" data-count="observation">0</span></a>
@@ -108,11 +147,11 @@
                     <a href="#sec-cloture">Clôture</a>
                 </nav>
 
-                <div class="edit-main">
+                <div class="edit-main span-9">
                     <!-- Informations générales -->
-                    <section class="form-section" id="sec-infos">
-                        <h2 class="section-title">Informations générales</h2>
-                        <div class="form-grid">
+                    <section class="form-section card card--lg glass" id="sec-infos" aria-labelledby="h-infos">
+                        <h2 class="section-title" id="h-infos">Informations</h2>
+                        <div class="group">
                             <div class="form-group">
                                 <label for="auditNumber">N° d'audit</label>
                                 <input type="text" id="auditNumber" name="auditNumber" placeholder="Ex : 2026-001">
@@ -131,43 +170,45 @@
                             </div>
                             <div class="form-group">
                                 <label for="reportDate">Date du rapport</label>
-                                <input type="text" id="reportDate" name="reportDate" placeholder="JJ.MM.AAAA">
+                                <input type="text" id="reportDate" name="reportDate" placeholder="JJ.MM.AAAA" inputmode="numeric">
+                            </div>
+                            <div class="form-group">
+                                <label for="perimeter">Périmètre</label>
+                                <input type="text" id="perimeter" name="perimeter" placeholder="Ex : Atelier Fournitures">
                             </div>
                         </div>
 
-                        <div class="form-group">
-                            <label for="objective">Objectif</label>
-                            <textarea id="objective" name="objective" rows="3" placeholder="Objectif de l'audit"></textarea>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="perimeter">Périmètre</label>
-                            <input type="text" id="perimeter" name="perimeter" placeholder="Ex : Atelier Fournitures">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="referentials">Référentiels</label>
-                            <textarea id="referentials" name="referentials" rows="4"
-                                      placeholder="INS-1234 Description du référentiel&#10;PRO-5678 Autre référentiel&#10;DOCUMENTATION TECHNIQUE"></textarea>
-                            <small class="field-help">Un référentiel par ligne.</small>
-                        </div>
-
-                        <div class="form-grid">
+                        <div class="group">
                             <div class="form-group">
-                                <label for="contextePoste">Contexte – Poste</label>
+                                <label for="objective">Objectif</label>
+                                <textarea id="objective" name="objective" rows="3" placeholder="Objectif de l'audit"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="referentials">Référentiels</label>
+                                <textarea id="referentials" name="referentials" rows="3" class="mono"
+                                          placeholder="INS-1234 Description du référentiel&#10;PRO-5678 Autre référentiel&#10;DOCUMENTATION TECHNIQUE"></textarea>
+                                <small class="field-help">Un référentiel par ligne.</small>
+                            </div>
+                        </div>
+
+                        <h3 class="group-title">Contexte</h3>
+                        <div class="group">
+                            <div class="form-group">
+                                <label for="contextePoste">Poste</label>
                                 <input type="text" id="contextePoste" name="contextePoste" placeholder="Ex : Poste 1234">
                             </div>
                             <div class="form-group">
-                                <label for="contexteArticle">Contexte – Article</label>
+                                <label for="contexteArticle">Article</label>
                                 <input type="text" id="contexteArticle" name="contexteArticle" placeholder="Ex : Article ABC">
                             </div>
                             <div class="form-group">
-                                <label for="contexteOperation">Contexte – Opération</label>
+                                <label for="contexteOperation">Opération</label>
                                 <input type="text" id="contexteOperation" name="contexteOperation" placeholder="Ex : OP-100">
                             </div>
                         </div>
 
-                        <div class="form-grid form-grid--2">
+                        <h3 class="group-title">Participants</h3>
+                        <div class="group">
                             <div class="form-group">
                                 <label for="auditedPersons">Personnes auditées</label>
                                 <textarea id="auditedPersons" name="auditedPersons" rows="3" placeholder="John DOE&#10;Jane SMITH"></textarea>
@@ -181,12 +222,25 @@
                         </div>
                     </section>
 
+                    <!-- Assistant : complétude du plan d'action et référentiels cités -->
+                    <section class="form-section card card--lg glass assistant" id="sec-assistant" aria-labelledby="h-assistant">
+                        <div class="ring" id="planRing" role="progressbar" aria-label="Plan d'action renseigné" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                            <svg viewBox="0 0 120 120" aria-hidden="true"><circle class="ring__track" cx="60" cy="60" r="50"/><circle class="ring__value" id="planRingValue" cx="60" cy="60" r="50"/></svg>
+                            <span class="ring__label" id="planRingLabel">–</span>
+                        </div>
+                        <div class="assistant__body">
+                            <h2 class="section-title" id="h-assistant">Assistant</h2>
+                            <p class="caption">Plan d'action (action, responsable, délai) et référentiels cités, vérifiés pendant la saisie.</p>
+                            <ul class="tips" id="assistantTips" aria-live="polite"></ul>
+                        </div>
+                    </section>
+
                     <!-- Points forts -->
-                    <section class="form-section" id="sec-pointsforts">
+                    <section class="form-section card glass" id="sec-pointsforts" aria-labelledby="h-pf">
                         <div class="section-header">
-                            <h2 class="section-title">Points forts</h2>
+                            <h2 class="section-title" id="h-pf">Points forts <span class="count" data-count="pointfort">0</span></h2>
                             <button type="button" id="addPointFort" class="btn btn--secondary btn--sm">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Ajouter un point fort
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Ajouter
                             </button>
                         </div>
                         <div id="pointsforts-container" class="items-container"></div>
@@ -194,11 +248,11 @@
                     </section>
 
                     <!-- Écarts -->
-                    <section class="form-section" id="sec-ecarts">
+                    <section class="form-section card card--lg glass" id="sec-ecarts" aria-labelledby="h-ecarts">
                         <div class="section-header">
-                            <h2 class="section-title">Écarts</h2>
+                            <h2 class="section-title" id="h-ecarts">Écarts <span class="count" data-count="ecart">0</span></h2>
                             <button type="button" id="addEcart" class="btn btn--secondary btn--sm">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Ajouter un écart
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Ajouter
                             </button>
                         </div>
                         <div id="ecarts-container" class="items-container"></div>
@@ -206,11 +260,11 @@
                     </section>
 
                     <!-- Observations -->
-                    <section class="form-section" id="sec-observations">
+                    <section class="form-section card glass" id="sec-observations" aria-labelledby="h-obs">
                         <div class="section-header">
-                            <h2 class="section-title">Observations</h2>
+                            <h2 class="section-title" id="h-obs">Observations <span class="count" data-count="observation">0</span></h2>
                             <button type="button" id="addObservation" class="btn btn--secondary btn--sm">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Ajouter une observation
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Ajouter
                             </button>
                         </div>
                         <div id="observations-container" class="items-container"></div>
@@ -218,55 +272,57 @@
                     </section>
 
                     <!-- Remarques -->
-                    <section class="form-section" id="sec-remarques">
-                        <h2 class="section-title">Remarques</h2>
-                        <div class="form-group">
-                            <label for="remarquesAudites">Remarques des audités</label>
-                            <textarea id="remarquesAudites" name="remarquesAudites" rows="4" placeholder="Remarque 1&#10;Remarque 2"></textarea>
-                            <small class="field-help">Une remarque par ligne.</small>
-                        </div>
-                        <div class="form-group">
-                            <label for="remarquesReunion">Remarques de la réunion de clôture</label>
-                            <textarea id="remarquesReunion" name="remarquesReunion" rows="4" placeholder="Remarque 1&#10;Remarque 2"></textarea>
-                            <small class="field-help">Une remarque par ligne.</small>
+                    <section class="form-section card glass" id="sec-remarques" aria-labelledby="h-remarques">
+                        <h2 class="section-title" id="h-remarques">Remarques</h2>
+                        <div class="group">
+                            <div class="form-group">
+                                <label for="remarquesAudites">Remarques des audités</label>
+                                <textarea id="remarquesAudites" name="remarquesAudites" rows="3" placeholder="Remarque 1&#10;Remarque 2"></textarea>
+                                <small class="field-help">Une remarque par ligne.</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="remarquesReunion">Réunion de clôture</label>
+                                <textarea id="remarquesReunion" name="remarquesReunion" rows="3" placeholder="Remarque 1&#10;Remarque 2"></textarea>
+                                <small class="field-help">Une remarque par ligne.</small>
+                            </div>
                         </div>
                     </section>
 
                     <!-- Clôture -->
-                    <section class="form-section" id="sec-cloture">
-                        <h2 class="section-title">Clôture et prochaines étapes</h2>
-
-                        <div class="form-group">
-                            <label for="prochainesEtapes">Prochaines étapes</label>
-                            <textarea id="prochainesEtapes" name="prochainesEtapes" rows="5"
-                                      placeholder="Étape 1&#10;Étape 2&#10;Étape 3">Formaliser l'ensemble des écarts dans un plan d'actions avec responsables identifiés et délais de traitement.
+                    <section class="form-section card glass" id="sec-cloture" aria-labelledby="h-cloture">
+                        <h2 class="section-title" id="h-cloture">Clôture</h2>
+                        <div class="group">
+                            <div class="form-group">
+                                <label for="prochainesEtapes">Prochaines étapes</label>
+                                <textarea id="prochainesEtapes" name="prochainesEtapes" rows="4"
+                                          placeholder="Étape 1&#10;Étape 2&#10;Étape 3">Formaliser l'ensemble des écarts dans un plan d'actions avec responsables identifiés et délais de traitement.
 Prioriser la mise en conformité documentaire (plans, FIR, MOV) et la formalisation des codes outillages.
 Renforcer le pilotage de la maintenance préventive MP1 et la traçabilité des contrôles dans Flexnet.</textarea>
-                            <small class="field-help">Une étape par ligne.</small>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="noteFinale">Note finale / message de clôture</label>
-                            <textarea id="noteFinale" name="noteFinale" rows="4"
-                                      placeholder="Message de conclusion">Le plan d'actions détaillé est disponible dans l'outil Monday. Une revue d'avancement permettra de suivre la fermeture des écarts, de mesurer l'impact sur la stabilité du process et de vérifier l'amélioration de la communication entre production, maintenance et industrialisation.</textarea>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="planActionRecipients">Destinataires du plan d'action</label>
-                            <textarea id="planActionRecipients" name="planActionRecipients" rows="2"
-                                      placeholder="prenom.nom@entreprise.com"></textarea>
-                            <small class="field-help">Une adresse par ligne. Intégrées au rapport : le bouton « Export Plan d'action » les pré-remplit, quel que soit le poste qui l'ouvre. Mémorisées dans ce navigateur pour les prochains rapports.</small>
+                                <small class="field-help">Une étape par ligne.</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="noteFinale">Message de clôture</label>
+                                <textarea id="noteFinale" name="noteFinale" rows="4"
+                                          placeholder="Message de conclusion">Le plan d'actions détaillé est disponible dans l'outil Monday. Une revue d'avancement permettra de suivre la fermeture des écarts, de mesurer l'impact sur la stabilité du process et de vérifier l'amélioration de la communication entre production, maintenance et industrialisation.</textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="planActionRecipients">Destinataires du plan d'action</label>
+                                <textarea id="planActionRecipients" name="planActionRecipients" rows="2"
+                                          placeholder="prenom.nom@entreprise.com"></textarea>
+                                <small class="field-help">Une adresse par ligne. Intégrées au rapport : le bouton « Export Plan d'action » les pré-remplit, quel que soit le poste qui l'ouvre. Mémorisées dans ce navigateur pour les prochains rapports.</small>
+                            </div>
                         </div>
                     </section>
                 </div>
 
-                <!-- Barre d'actions : toujours visible -->
-                <div class="action-bar" role="toolbar" aria-label="Actions du rapport">
+                <!-- Barre d'actions flottante : toujours visible -->
+                <div class="action-bar glass" role="toolbar" aria-label="Actions du rapport">
                     <span class="action-bar__status" id="formStatus"></span>
-                    <span class="action-bar__spacer"></span>
-                    <button type="button" id="resetForm" class="btn btn--ghost btn--danger-text">Réinitialiser</button>
-                    <button type="button" id="exportJsonBtn" class="btn btn--secondary">Exporter JSON</button>
-                    <button type="button" id="saveAndPreview" class="btn btn--primary">Prévisualiser le rapport</button>
+                    <button type="button" id="resetForm" class="btn btn--ghost btn--danger-text btn--sm" aria-label="Réinitialiser">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg><span class="btn__label">Réinitialiser</span>
+                    </button>
+                    <button type="button" id="exportJsonBtn" class="btn btn--secondary btn--sm">Exporter JSON</button>
+                    <button type="button" id="saveAndPreview" class="btn btn--primary btn--sm">Prévisualiser</button>
                 </div>
             </form>
         </section>
@@ -274,28 +330,47 @@ Renforcer le pilotage de la maintenance préventive MP1 et la traçabilité des 
         <!-- =====================================================
              ÉTAPE 3 : APERÇU
              ===================================================== -->
-        <section id="tab-preview" class="tab-content">
-            <div class="page-head page-head--row">
-                <div>
-                    <h1 class="page-title">Aperçu du rapport</h1>
-                    <p class="page-subtitle">Vérifiez le rendu avant de télécharger le fichier HTML.</p>
+        <section id="tab-preview" class="tab-content" role="tabpanel" aria-labelledby="tabbtn-preview">
+            <div class="bento">
+                <div class="card card--lg glass span-8 preview-card">
+                    <div class="section-header">
+                        <h1 class="large-title large-title--sm">Aperçu du rapport</h1>
+                        <button type="button" id="backToEdit" class="btn btn--ghost btn--sm">Retour à l'édition</button>
+                    </div>
+                    <div class="empty-state empty-state--inline" id="previewEmpty">
+                        <h2 class="title-2">Aucun aperçu</h2>
+                        <p class="caption">Générez-le depuis l'étape Édition avec « Prévisualiser ».</p>
+                    </div>
+                    <div class="preview-frame" id="previewFrame" hidden>
+                        <iframe id="previewIframe" title="Aperçu du rapport"></iframe>
+                    </div>
                 </div>
-                <div class="page-actions">
-                    <button type="button" id="backToEdit" class="btn btn--secondary">Retour à l'édition</button>
-                    <button type="button" id="downloadHtmlFinal" class="btn btn--primary">Télécharger le HTML</button>
+
+                <div class="stack span-4">
+                    <div class="card card--lg glass">
+                        <p class="eyebrow">Prêt à partager</p>
+                        <p class="figure"><span id="previewSize">–</span> <span class="figure__unit">Ko</span></p>
+                        <dl class="kv">
+                            <div><dt>Écarts</dt><dd id="previewEcarts">–</dd></div>
+                            <div><dt>Photos</dt><dd id="previewPhotos">–</dd></div>
+                            <div><dt>Hors ligne</dt><dd class="is-ok">Oui</dd></div>
+                        </dl>
+                        <button type="button" id="downloadHtmlFinal" class="btn btn--primary btn--block">Télécharger le HTML</button>
+                    </div>
+                    <div class="card glass">
+                        <h2 class="title-2">En réunion</h2>
+                        <p class="caption caption--lg">Saisissez le plan d'action directement dans le rapport, puis enregistrez avec <kbd>Ctrl</kbd> + <kbd>S</kbd>. Un brouillon de secours reste dans le navigateur.</p>
+                    </div>
+                    <div class="card glass">
+                        <h2 class="title-2">Destinataires</h2>
+                        <ul class="addr-list" id="previewRecipients"><li class="caption">Aucun destinataire.</li></ul>
+                    </div>
                 </div>
-            </div>
-            <div class="empty-state" id="previewEmpty">
-                <h2 class="section-title">Aucun aperçu</h2>
-                <p class="page-subtitle">Générez-le depuis l'étape Édition avec « Prévisualiser le rapport ».</p>
-            </div>
-            <div class="preview-frame" id="previewFrame" hidden>
-                <iframe id="previewIframe" title="Aperçu du rapport"></iframe>
             </div>
         </section>
     </main>
 
-    <footer class="footer">Générateur de rapports d'audit · v1.5</footer>
+    <footer class="footer">Générateur de rapports d'audit · v1.6</footer>
 
     <!-- Bibliothèques en local (fonctionne hors ligne / derrière un proxy) -->
     <!-- mammoth 1.6.0 et heic2any 0.0.4, copies du paquet npm officiel -->
