@@ -2195,6 +2195,15 @@ function generateSlide1(data, total) {
 }
 
 
+/**
+ * Référence d'une image = son index dans data.images (copie unique dans
+ * embedded-audit-data). Le runtime du rapport remplit src au chargement :
+ * chaque photo n'est plus stockée deux fois dans le HTML.
+ */
+function getImageRef(data, img) {
+    return Array.isArray(data.images) ? data.images.indexOf(img) : -1;
+}
+
 function escapeHtmlAttr(str) {
     if (!str) return '';
     return String(str)
@@ -2259,7 +2268,7 @@ function generatePointFortSlides(data, totalSlides, imagesPerPointFort = []) {
                         const safeAlt = escapeHtmlAttr(img.alt || '');
                         const safeCaption = escapeHtmlAttr(`Point fort ${pfNumber} - ${img.alt || ''}`);
                         return `
-                            <img src="${escapeHtmlAttr(img.base64)}"
+                            <img data-img="${getImageRef(data, img)}"
                                  alt="${safeAlt}"
                                  class="zoomable"
                                  data-caption="${safeCaption}"
@@ -2334,7 +2343,7 @@ function generateEcartSlides(data, totalSlides, imagesPerEcart = []) {
 						const safeAlt = escapeHtmlAttr(img.alt || '');
 						const safeCaption = escapeHtmlAttr(`Écart ${ecart.number} - ${img.alt || ''}`);
 						return `
-							<img src="${escapeHtmlAttr(img.base64)}" 
+							<img data-img="${getImageRef(data, img)}" 
 								 alt="${safeAlt}" 
 								 class="zoomable" 
 								 data-caption="${safeCaption}"
@@ -2394,7 +2403,7 @@ function generateObservationsSlide(data, total, imagesPerObservation) {
         const imagesHTML = obsImages.length > 0 ? `
             <div class="image-block">
                 ${obsImages.map((img, imgIndex) => `
-                    <img src="${escapeHtmlAttr(img.base64)}" 
+                    <img data-img="${getImageRef(data, img)}" 
                          alt="${escapeHtmlAttr(img.alt || img.caption || 'Image')}" 
                          class="zoomable loaded" 
                          data-caption="Observation ${obsNumber} - ${escapeHtmlAttr(img.alt || img.caption || 'Image')}"
@@ -2804,6 +2813,25 @@ function getPlanActionRecipients() {
 
 function getScripts(recipients = []) {
   const RAW_SCRIPT = `
+/* =========================================================
+ IMAGES : src rempli depuis embedded-audit-data (copie unique).
+ Doit s'exécuter avant l'observer d'images et la lightbox.
+ ========================================================= */
+(function () {
+  try {
+    var el = document.getElementById("embedded-audit-data");
+    var data = JSON.parse((el && el.textContent) || "{}");
+    var images = Array.isArray(data.images) ? data.images : [];
+    document.querySelectorAll("img[data-img]").forEach(function (img) {
+      var entry = images[parseInt(img.getAttribute("data-img"), 10)];
+      if (entry && typeof entry.base64 === "string" && entry.base64.indexOf("data:image/") === 0) {
+        img.src = entry.base64;
+      }
+    });
+  } catch (e) {
+    console.error("[audit] Images non chargées:", e);
+  }
+})();
 /* =========================================================
  ANTI "PAGE BLANCHE" : si un script plante ou si
  IntersectionObserver n'existe pas dans le viewer (srcdoc),
