@@ -38,6 +38,15 @@ class AuditEditor {
             }
         };
 
+        // Plan d'action attendu sur les écarts et les observations
+        this.PLAN_FIELDS = [
+            { key: 'action', label: 'Action' },
+            { key: 'responsable', label: 'Responsable' },
+            { key: 'delai', label: 'Délai' }
+        ];
+        // Codes de référentiel du type INS-2426, PRO-0255
+        this.REF_CODE = /\b[A-Z]{2,5}-\d{2,6}\b/g;
+
         this.RECIPIENTS_STORAGE_KEY = 'generator-plan-action-recipients';
 
         this.DEFAULT_OBJECTIVE =
@@ -47,6 +56,7 @@ class AuditEditor {
         this.attachEventListeners();
         this.attachCardListeners();
         this.initSectionNav();
+        this.initAssistant();
         this.initClipboardPaste();
     }
 
@@ -362,6 +372,9 @@ class AuditEditor {
                     <span class="item-card__chevron" aria-hidden="true">${ICONS.chevron}</span>
                     <span class="badge">${cfg.label} ${number}</span>
                     <span class="item-card__summary"></span>
+                    ${kind === 'pointfort' ? '' : `<span class="pills" aria-hidden="true">${
+                        this.PLAN_FIELDS.map(f => `<span class="pill" data-pill="${f.key}">${f.label}</span>`).join('')
+                    }</span>`}
                     <span class="item-card__meta"></span>
                 </button>
                 <button type="button" class="icon-btn icon-btn--danger" data-action="remove"
@@ -401,29 +414,34 @@ class AuditEditor {
                 <span class="field-label">${label}</span>
                 <textarea class="${cls}" rows="${rows}" placeholder="${placeholder}">${value(key)}</textarea>
             </label>`;
-        const owner = (prefix) => `
-            <div class="form-grid">
-                ${text(`${prefix}-responsable`, 'responsable', 'Responsable', 'Nom du responsable')}
-                ${text(`${prefix}-delai`, 'delai', 'Délai', 'Ex : 31/12/2026')}
-            </div>`;
+        const group = (...fields) => `<div class="group">${fields.join('')}</div>`;
+        const owner = (prefix) => [
+            text(`${prefix}-responsable`, 'responsable', 'Responsable', 'Nom ou fonction'),
+            text(`${prefix}-delai`, 'delai', 'Délai', 'Ex : 31/12/2026')
+        ];
 
         if (kind === 'pointfort') {
-            return text('pointfort-titre', 'titre', 'Titre', 'Ex : Standard bien appliqué')
-                + area('pointfort-constat', 'constat', 'Constat', 'Décrivez le point fort observé')
-                + this.renderPhotoSection(kind);
+            return group(
+                text('pointfort-titre', 'titre', 'Titre', 'Ex : Standard bien appliqué'),
+                area('pointfort-constat', 'constat', 'Constat', 'Décrivez le point fort observé')
+            ) + this.renderPhotoSection(kind);
         }
         if (kind === 'ecart') {
-            return text('ecart-exigence', 'exigence', 'Exigence', 'Ex : INS-2426 / Bonnes pratiques de fabrication')
-                + area('ecart-constat', 'constat', 'Constat', 'Décrivez le constat observé')
+            return group(
+                text('ecart-exigence', 'exigence', 'Exigence', 'Ex : INS-2426 / Bonnes pratiques de fabrication'),
+                area('ecart-constat', 'constat', 'Constat', 'Décrivez le constat observé')
+            )
+                + '<span class="ref-detected" hidden></span>'
                 + this.renderPhotoSection(kind)
-                + text('ecart-action', 'action', 'Action corrective', 'Action à mettre en place')
-                + owner('ecart');
+                + group(text('ecart-action', 'action', 'Action corrective', 'Action à mettre en place'), ...owner('ecart'));
         }
-        return area('observation-constat', 'constat', 'Constat', "Décrivez l'observation")
+        return group(area('observation-constat', 'constat', 'Constat', "Décrivez l'observation"))
             + this.renderPhotoSection(kind)
-            + area('observation-risque', 'risque', 'Risque associé', 'Décrivez le risque potentiel', 3)
-            + text('observation-action', 'action', 'Action', 'Action à mettre en place')
-            + owner('observation');
+            + group(
+                area('observation-risque', 'risque', 'Risque associé', 'Décrivez le risque potentiel', 3),
+                text('observation-action', 'action', 'Action', 'Action à mettre en place'),
+                ...owner('observation')
+            );
     }
 
     renderPhotoSection(kind) {
@@ -493,6 +511,8 @@ class AuditEditor {
     setCollapsed(card, collapsed) {
         card.classList.toggle('is-collapsed', collapsed);
         card.querySelector('.item-card__toggle').setAttribute('aria-expanded', String(!collapsed));
+        // Contenu replié : ni focusable au clavier, ni lu par les lecteurs d'écran
+        card.querySelector('.collapsible').inert = collapsed;
     }
 
     async handleImageUpload(kind, number, input) {
@@ -624,6 +644,9 @@ class AuditEditor {
             el.textContent = counts[el.dataset.count] || 0;
         });
 
+        this.updateSynthesis();
+        this.updateAssistant();
+
         const s = (n) => (n > 1 ? 's' : '');
         const status = document.getElementById('formStatus');
         if (status) {
@@ -633,6 +656,23 @@ class AuditEditor {
                 `${counts.observation} observation${s(counts.observation)}`
             ].join(' · ');
         }
+    }
+
+    /**
+     * Bandeau de synthèse : n° / période / titre de l'audit, mis à jour à la saisie
+     */
+    updateSynthesis() {
+        const meta = document.getElementById('synthMeta');
+        const title = document.getElementById('synthTitle');
+        if (!meta || !title) return;
+
+        const number = this.formFields.auditNumber.value.trim();
+        const period = this.formFields.period.value.trim();
+        meta.textContent = ['Audit', number, period].filter(Boolean).join(' · ');
+
+        const titleText = this.formFields.auditTitle.value.trim();
+        title.textContent = titleText || 'Sans titre';
+        title.classList.toggle('is-empty', !titleText);
     }
 
     attachCardListeners() {
@@ -676,11 +716,164 @@ class AuditEditor {
         });
 
         this.form.addEventListener('input', (e) => {
+            if (['auditNumber', 'auditTitle', 'period'].includes(e.target.id)) this.updateSynthesis();
+            this.scheduleAssistant();
             const card = e.target.closest('.item-card');
             if (card && e.target.matches(this.KINDS[card.dataset.kind].summaryField)) {
                 this.updateCardSummary(card);
             }
         });
+    }
+
+    /**
+     * Assistant : complétude du plan d'action (écarts, observations) et
+     * codes de référentiel cités dans les exigences mais absents de la liste
+     */
+    initAssistant() {
+        this.assistantFrame = null;
+        const tips = document.getElementById('assistantTips');
+        if (!tips) return;
+
+        tips.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-tip]');
+            if (!btn) return;
+
+            if (btn.dataset.tip === 'add-ref') {
+                const field = this.formFields.referentials;
+                const current = field.value.replace(/\s+$/, '');
+                field.value = (current ? current + '\n' : '') + btn.dataset.code;
+                this.updateAssistant();
+                showToast(`${btn.dataset.code} ajouté aux référentiels`);
+                return;
+            }
+
+            // Compléter : ouvre la fiche et place le curseur dans le premier champ vide
+            const card = this.getCard(btn.dataset.kind, Number(btn.dataset.number));
+            if (!card) return;
+            this.setCollapsed(card, false);
+            const field = card.querySelector(`.${this.KINDS[btn.dataset.kind].prefix}-${btn.dataset.field}`);
+            if (!field) return;
+            field.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            field.focus({ preventScroll: true });
+        });
+    }
+
+    // Saisie : un seul recalcul par image
+    scheduleAssistant() {
+        if (this.assistantFrame) return;
+        this.assistantFrame = requestAnimationFrame(() => {
+            this.assistantFrame = null;
+            this.updateAssistant();
+        });
+    }
+
+    planStatus(card) {
+        const prefix = this.KINDS[card.dataset.kind].prefix;
+        return this.PLAN_FIELDS.map(f => {
+            const field = card.querySelector(`.${prefix}-${f.key}`);
+            return { ...f, filled: !!(field && field.value.trim()) };
+        });
+    }
+
+    refCodes(text) {
+        return Array.from(new Set(text.match(this.REF_CODE) || []));
+    }
+
+    updateAssistant() {
+        const tipsList = document.getElementById('assistantTips');
+        const referentials = (this.formFields.referentials.value || '').toUpperCase();
+        const isKnown = (code) => referentials.includes(code);
+        const esc = (s) => this.escapeHtmlInput(s);
+        const tips = [];
+        let filled = 0;
+        let expected = 0;
+
+        ['ecart', 'observation'].forEach(kind => {
+            const container = this.getContainer(kind);
+            if (!container) return;
+            container.querySelectorAll(`.${this.KINDS[kind].cardClass}`).forEach(card => {
+                const number = this.getCardNumber(card);
+                const status = this.planStatus(card);
+                const missing = status.filter(f => !f.filled);
+                filled += status.length - missing.length;
+                expected += status.length;
+
+                status.forEach(f => {
+                    const pill = card.querySelector(`[data-pill="${f.key}"]`);
+                    if (pill) pill.classList.toggle('is-ok', f.filled);
+                });
+
+                const name = `${this.KINDS[kind].label} ${number}`;
+                if (missing.length) {
+                    tips.push({
+                        type: 'missing',
+                        html: `<strong>${name}</strong> : ${missing.map(f => f.label.toLowerCase()).join(', ')} à compléter`,
+                        button: `<button type="button" class="btn btn--secondary btn--sm" data-tip="fill" data-kind="${kind}" data-number="${number}" data-field="${missing[0].key}" aria-label="Compléter ${name.toLowerCase()}">Compléter</button>`
+                    });
+                }
+
+                if (kind !== 'ecart') return;
+                const exigence = card.querySelector('.ecart-exigence');
+                const codes = this.refCodes(exigence ? exigence.value : '');
+                const chip = card.querySelector('.ref-detected');
+                if (chip) {
+                    chip.hidden = codes.length === 0;
+                    const unknown = codes.filter(code => !isKnown(code));
+                    chip.classList.toggle('is-missing', unknown.length > 0);
+                    chip.textContent = unknown.length
+                        ? `Absent des référentiels : ${unknown.join(', ')}`
+                        : `✓ Référentiel reconnu : ${codes.join(', ')}`;
+                }
+                codes.filter(code => !isKnown(code)).forEach(code => {
+                    if (tips.some(t => t.code === code)) return;
+                    tips.push({
+                        type: 'ref',
+                        code,
+                        html: `<strong>${esc(code)}</strong> cité dans l'écart ${number} mais absent des référentiels`,
+                        button: `<button type="button" class="btn btn--secondary btn--sm" data-tip="add-ref" data-code="${esc(code)}" aria-label="Ajouter ${esc(code)} aux référentiels">Ajouter</button>`
+                    });
+                });
+            });
+        });
+
+        // Anneau de progression
+        const pct = expected ? Math.round(filled / expected * 100) : 0;
+        const ring = document.getElementById('planRing');
+        const ringValue = document.getElementById('planRingValue');
+        const ringLabel = document.getElementById('planRingLabel');
+        if (ring && ringValue && ringLabel) {
+            ringValue.style.strokeDashoffset = String(314.16 * (1 - pct / 100));
+            ringLabel.textContent = expected ? `${pct} %` : '–';
+            ring.setAttribute('aria-valuenow', String(pct));
+            ring.setAttribute('aria-valuetext', expected ? `${pct} % du plan d'action renseigné` : 'Aucun écart ni observation');
+        }
+
+        const tipsCount = document.getElementById('tipsCount');
+        if (tipsCount) tipsCount.textContent = tips.length;
+        if (!tipsList) return;
+
+        const icon = { missing: '!', ref: '§', ok: '✓' };
+        const MAX_TIPS = 5;
+        let html = tips.slice(0, MAX_TIPS).map(t => `
+            <li class="tip tip--${t.type}">
+                <span class="tip__icon" aria-hidden="true">${icon[t.type]}</span>
+                <span class="tip__text">${t.html}</span>
+                ${t.button}
+            </li>`).join('');
+        if (tips.length > MAX_TIPS) {
+            html += `<li class="tip tip--more">+ ${tips.length - MAX_TIPS} autre${tips.length - MAX_TIPS > 1 ? 's' : ''} point${tips.length - MAX_TIPS > 1 ? 's' : ''} à traiter</li>`;
+        }
+        if (!tips.length) {
+            const text = expected
+                ? '<strong>Tout est prêt.</strong> Le plan d\'action est complet.'
+                : 'Ajoutez un écart ou une observation pour suivre le plan d\'action.';
+            html = `<li class="tip tip--ok"><span class="tip__icon" aria-hidden="true">${icon.ok}</span><span class="tip__text">${text}</span></li>`;
+        }
+        // Pas de réécriture si rien n'a changé : préserve le focus et les animations
+        if (this.lastTipsHtml !== html) {
+            this.lastTipsHtml = html;
+            tipsList.innerHTML = html;
+        }
     }
 
     /**
@@ -1128,27 +1321,36 @@ class AuditEditor {
             lightbox = document.createElement('div');
             lightbox.id = 'imageLightbox';
             lightbox.className = 'image-lightbox';
+            lightbox.setAttribute('role', 'dialog');
+            lightbox.setAttribute('aria-modal', 'true');
+            lightbox.setAttribute('aria-label', 'Photo agrandie');
             lightbox.innerHTML = `
                 <div class="image-lightbox-content">
-                    <button class="image-lightbox-close" onclick="document.getElementById('imageLightbox').classList.remove('active')">
-                        ✕
-                    </button>
-                    <img src="" alt="Preview" class="image-lightbox-img">
+                    <button type="button" class="image-lightbox-close" aria-label="Fermer">✕</button>
+                    <img src="" alt="Photo agrandie" class="image-lightbox-img">
                 </div>
             `;
             document.body.appendChild(lightbox);
 
+            // Fermeture : focus rendu à l'élément qui a ouvert la photo
+            const close = () => {
+                lightbox.classList.remove('active');
+                if (this.lightboxOpener && this.lightboxOpener.isConnected) this.lightboxOpener.focus();
+            };
+            lightbox.querySelector('.image-lightbox-close').addEventListener('click', close);
+
             // Fermeture au clic sur le fond
             lightbox.addEventListener('click', (e) => {
-                if (e.target === lightbox) {
-                    lightbox.classList.remove('active');
-                }
+                if (e.target === lightbox) close();
             });
 
-            // Fermeture avec la touche Échap
+            // Échap ferme ; Tab reste sur le bouton Fermer (seul élément actif)
             document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' && lightbox.classList.contains('active')) {
-                    lightbox.classList.remove('active');
+                if (!lightbox.classList.contains('active')) return;
+                if (e.key === 'Escape') close();
+                if (e.key === 'Tab') {
+                    e.preventDefault();
+                    lightbox.querySelector('.image-lightbox-close').focus();
                 }
             });
 
@@ -1160,6 +1362,7 @@ class AuditEditor {
             });
         }
 
+        this.lightboxOpener = document.activeElement;
         const img = lightbox.querySelector('.image-lightbox-img');
 
         const preloadImg = new Image();
@@ -1170,6 +1373,7 @@ class AuditEditor {
                 requestAnimationFrame(() => {
                     lightbox.classList.add('active');
                     document.body.style.overflow = 'hidden';
+                    lightbox.querySelector('.image-lightbox-close').focus();
                 });
             });
         };
