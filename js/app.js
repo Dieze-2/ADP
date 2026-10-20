@@ -659,17 +659,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const tabBtns = document.querySelectorAll('.tab-btn');
     const tabContents = document.querySelectorAll('.tab-content');
+    const tabList = document.querySelector('.segmented');
     const STEP_ORDER = ['upload', 'edit', 'preview'];
 
-    // Stepper : étape courante, étapes passées cochées
+    // Segmented control : onglet sélectionné, curseur positionné via data-current
     function updateStepper(currentTab) {
-        const currentIndex = STEP_ORDER.indexOf(currentTab);
+        if (tabList) tabList.dataset.current = currentTab;
         tabBtns.forEach(b => {
-            const index = STEP_ORDER.indexOf(b.dataset.tab);
-            b.classList.toggle('is-current', index === currentIndex);
-            b.classList.toggle('is-done', index < currentIndex);
-            if (index === currentIndex) b.setAttribute('aria-current', 'step');
-            else b.removeAttribute('aria-current');
+            const selected = b.dataset.tab === currentTab;
+            b.setAttribute('aria-selected', String(selected));
+            b.tabIndex = selected ? 0 : -1;
         });
 
         // Aperçu : état vide tant qu'aucun rapport n'a été généré
@@ -680,6 +679,31 @@ document.addEventListener('DOMContentLoaded', () => {
         if (previewEmpty) previewEmpty.hidden = hasPreview;
         if (previewFrame) previewFrame.hidden = !hasPreview;
         if (downloadBtn) downloadBtn.disabled = !hasPreview;
+        if (currentTab === 'preview') updatePreviewSummary();
+    }
+
+    // Cartes latérales de l'aperçu : poids du fichier, écarts, photos, destinataires
+    function updatePreviewSummary() {
+        const data = window.currentEditedData;
+        const html = window.currentEditedHTML;
+        const setText = (id, value) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = value;
+        };
+
+        setText('previewSize', html ? Math.round(new Blob([html]).size / 1024).toLocaleString('fr-FR') : '–');
+        setText('previewEcarts', data && Array.isArray(data.ecarts) ? data.ecarts.length : '–');
+        setText('previewPhotos', data && Array.isArray(data.images) ? data.images.length : '–');
+
+        const list = document.getElementById('previewRecipients');
+        if (!list) return;
+        const recipients = (data && Array.isArray(data.planActionRecipients)) ? data.planActionRecipients : [];
+        list.replaceChildren(...(recipients.length ? recipients : [null]).map(address => {
+            const li = document.createElement('li');
+            if (address) li.textContent = address;
+            else { li.className = 'caption'; li.textContent = 'Aucun destinataire.'; }
+            return li;
+        }));
     }
 
     tabBtns.forEach(btn => {
@@ -694,6 +718,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const targetContent = document.getElementById(`tab-${targetTab}`);
             if (targetContent) targetContent.classList.add('active');
             updateStepper(targetTab);
+        });
+
+        // Flèches gauche / droite : onglet voisin (motif ARIA « tabs »)
+        btn.addEventListener('keydown', (e) => {
+            if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+            const offset = e.key === 'ArrowRight' ? 1 : STEP_ORDER.length - 1;
+            const next = STEP_ORDER[(STEP_ORDER.indexOf(btn.dataset.tab) + offset) % STEP_ORDER.length];
+            const nextBtn = document.querySelector(`.tab-btn[data-tab="${next}"]`);
+            if (nextBtn) { nextBtn.click(); nextBtn.focus(); }
         });
     });
     updateStepper('upload');
