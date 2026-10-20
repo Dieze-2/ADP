@@ -132,7 +132,7 @@ function generateAuditReport(data) {
     ${getMobileNav(totalSlides)}
     ${getSlideMenu(data, totalSlides)}
     ${getLightbox()}
-    ${getScripts(getPlanActionRecipients())}
+    ${getScripts(getPlanActionRecipients(data))}
 </body>
 </html>`;
 }
@@ -2770,6 +2770,9 @@ function normalizeAuditDataForEmbed(data) {
         // ✅ images : on conserve tel quel (base64, alt, ecartNumber, observationNumber, pointFortNumber...)
         images: Array.isArray(d.images) ? d.images : [],
 
+        // Conservés dans les données : survivent à l'enregistrement et au ré-import
+        planActionRecipients: Array.isArray(d.planActionRecipients) ? d.planActionRecipients : [],
+
         cloture: {
             noteFinale: d.cloture?.noteFinale || '',
             prochainesEtapesTexte:
@@ -2801,10 +2804,16 @@ function escapeHtmlJsonForScriptTag(obj) {
 // ========================================
 
 /**
- * Destinataires du mail « Plan d'action » : lus dans config.local.js
- * (non versionné) pour ne pas publier d'adresses dans le repo.
+ * Destinataires du mail « Plan d'action » : saisis dans le formulaire
+ * (data.planActionRecipients), sinon config.local.js (non versionné).
+ * Jamais d'adresses dans le repo.
  */
-function getPlanActionRecipients() {
+function getPlanActionRecipients(data) {
+    const fromData = data && Array.isArray(data.planActionRecipients)
+        ? data.planActionRecipients.filter(r => typeof r === 'string' && r.trim())
+        : [];
+    if (fromData.length > 0) return fromData;
+
     const cfg = (typeof window !== 'undefined' && window.AUDIT_CONFIG) || {};
     return Array.isArray(cfg.planActionRecipients)
         ? cfg.planActionRecipients.filter(r => typeof r === 'string' && r.trim())

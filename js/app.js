@@ -213,6 +213,9 @@ class AuditConverterApp {
             auditedPersons: Array.isArray(data.auditedPersons) ? data.auditedPersons : [],
             distribution: Array.isArray(data.distribution) ? data.distribution : [],
             images: Array.isArray(data.images) ? data.images : [],
+            planActionRecipients: Array.isArray(data.planActionRecipients)
+                ? data.planActionRecipients.filter(r => typeof r === 'string' && r.trim())
+                : [],
             cloture: {
                 noteFinale: data.cloture?.noteFinale || '',
                 prochainesEtapesTexte: prochainesEtapesTexte
@@ -314,6 +317,10 @@ class AuditConverterApp {
         if (embeddedEl && embeddedEl.textContent) {
             try {
                 const embeddedData = JSON.parse(embeddedEl.textContent);
+                // Rapports antérieurs : destinataires présents seulement dans le script du rapport
+                if (!Array.isArray(embeddedData.planActionRecipients)) {
+                    embeddedData.planActionRecipients = this.extractLegacyRecipients(doc);
+                }
                 console.log('✅ Données embarquées détectées (embedded-audit-data)');
                 return this.normalizeJsonData(embeddedData);
             } catch (e) {
@@ -524,6 +531,18 @@ class AuditConverterApp {
         console.log('  📷 Images:', data.images.length);
 
         return this.normalizeJsonData(data);
+    }
+
+    extractLegacyRecipients(doc) {
+        const scriptsEl = doc.getElementById('embedded-audit-scripts');
+        const match = scriptsEl && scriptsEl.textContent.match(/var PLAN_ACTION_RECIPIENTS = (\[[^\]]*\]);/);
+        if (!match) return [];
+        try {
+            const list = JSON.parse(match[1]);
+            return Array.isArray(list) ? list.filter(r => typeof r === 'string') : [];
+        } catch (e) {
+            return [];
+        }
     }
 
     showProgress(message, percent) {
