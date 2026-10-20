@@ -4,12 +4,39 @@
  * ✅ Ajout Points forts + pré-remplissage Objectif
  */
 
+// Icônes SVG 16 px (tracé Lucide), héritent de la couleur du texte
+const ICONS = {
+    chevron: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>',
+    trash: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+    plus: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>'
+};
+
 class AuditEditor {
     constructor() {
         this.currentData = null;
         this.pointFortCounter = 0;
         this.ecartCounter = 0;
         this.observationCounter = 0;
+        this.pendingUndo = null;
+
+        // Les trois types de cartes : seules les valeurs diffèrent
+        this.KINDS = {
+            pointfort: {
+                label: 'Point fort', cardClass: 'pointfort-card', idAttr: 'pointfortId',
+                imageKey: 'pointFortNumber', counter: 'pointFortCounter', prefix: 'pointfort',
+                summaryField: '.pointfort-titre'
+            },
+            ecart: {
+                label: 'Écart', cardClass: 'ecart-card', idAttr: 'ecartId',
+                imageKey: 'ecartNumber', counter: 'ecartCounter', prefix: 'ecart',
+                summaryField: '.ecart-exigence'
+            },
+            observation: {
+                label: 'Observation', cardClass: 'observation-card', idAttr: 'observationId',
+                imageKey: 'observationNumber', counter: 'observationCounter', prefix: 'observation',
+                summaryField: '.observation-constat'
+            }
+        };
 
         this.RECIPIENTS_STORAGE_KEY = 'generator-plan-action-recipients';
 
@@ -18,8 +45,11 @@ class AuditEditor {
 
         this.initializeElements();
         this.attachEventListeners();
-		this.initClipboardPaste();
+        this.attachCardListeners();
+        this.initSectionNav();
+        this.initClipboardPaste();
     }
+
 
     /**
      * Initialise les éléments DOM
@@ -32,6 +62,7 @@ class AuditEditor {
         this.resetFormBtn = document.getElementById('resetForm');
 
         this.form = document.getElementById('auditForm');
+        this.editEmpty = document.getElementById('editEmpty');
 
         // ✅ Points forts
         this.pointsFortsContainer = document.getElementById('pointsforts-container');
@@ -72,12 +103,13 @@ class AuditEditor {
         };
     }
 
+
     /**
      * Attache les écouteurs d'événements
      */
     attachEventListeners() {
         // Boutons principaux
-        this.loadFromJsonBtn.addEventListener('click', () => this.loadFromParsedData());
+        if (this.loadFromJsonBtn) this.loadFromJsonBtn.addEventListener('click', () => this.loadFromParsedData());
         this.createFromScratchBtn.addEventListener('click', () => this.createNewReport());
         this.saveAndPreviewBtn.addEventListener('click', () => this.saveAndPreview());
         this.exportJsonBtn.addEventListener('click', () => this.exportJSON());
@@ -90,10 +122,11 @@ class AuditEditor {
         }
 
         // Boutons d'ajout
-        if (this.addPointFortBtn) this.addPointFortBtn.addEventListener('click', () => this.addPointFort());
-        this.addEcartBtn.addEventListener('click', () => this.addEcart());
-        this.addObservationBtn.addEventListener('click', () => this.addObservation());
+        if (this.addPointFortBtn) this.addPointFortBtn.addEventListener('click', () => this.addPointFort(null, { isNew: true }));
+        this.addEcartBtn.addEventListener('click', () => this.addEcart(null, { isNew: true }));
+        this.addObservationBtn.addEventListener('click', () => this.addObservation(null, { isNew: true }));
     }
+
 
     /**
      * Charge les données depuis le parsing Word
@@ -113,13 +146,14 @@ class AuditEditor {
         if (!Array.isArray(this.currentData.pointsForts)) this.currentData.pointsForts = [];
 
         this.populateForm(this.currentData);
-        this.form.style.display = 'block';
+        this.showForm();
 
         // Scroll vers le haut du formulaire
         this.form.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
         console.log('✅ Formulaire rempli avec les données parsées');
     }
+
 
     /**
      * Crée un nouveau rapport vide
@@ -173,11 +207,12 @@ class AuditEditor {
         }
 
         this.populateForm(this.currentData);
-        this.form.style.display = 'block';
+        this.showForm();
         this.form.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
         console.log('✅ Formulaire vide créé');
     }
+
 
     /**
      * Remplit le formulaire avec les données
@@ -251,83 +286,433 @@ class AuditEditor {
         this.ecartCounter = 0;
         this.observationCounter = 0;
 
+        // Cartes repliées sauf la première de chaque section : vue d'ensemble immédiate
         const pointsForts = data.pointsForts || [];
-        pointsForts.forEach((pf) => this.addPointFort(pf));
+        pointsForts.forEach((pf, i) => this.addPointFort(pf, { collapsed: i > 0 }));
 
         const ecarts = data.ecarts || [];
-        ecarts.forEach((ecart) => this.addEcart(ecart));
+        ecarts.forEach((ecart, i) => this.addEcart(ecart, { collapsed: i > 0 }));
 
         const observations = data.observations || [];
-        observations.forEach((obs) => this.addObservation(obs));
+        observations.forEach((obs, i) => this.addObservation(obs, { collapsed: i > 0 }));
+
+        this.dismissUndo();
+        this.updateCounts();
 
         console.log(`✅ Formulaire rempli: ${pointsForts.length} point(s) fort(s), ${ecarts.length} écarts, ${observations.length} observations`);
     }
 
     // =====================================================
-    // ✅ POINTS FORTS
+    // CARTES : POINTS FORTS / ÉCARTS / OBSERVATIONS
+    // Rendu commun aux trois types ; actions par délégation (data-action)
     // =====================================================
 
-    addPointFort(pointFort = null) {
-        this.pointFortCounter++;
-        const pointFortNumber = this.pointFortCounter;
+    getContainer(kind) {
+        return {
+            pointfort: this.pointsFortsContainer,
+            ecart: this.ecartsContainer,
+            observation: this.observationsContainer
+        }[kind];
+    }
 
-        const pfCard = document.createElement('div');
-        pfCard.className = 'item-card pointfort-card';
-        pfCard.dataset.pointfortId = pointFortNumber;
+    getCardNumber(card) {
+        return parseInt(card.dataset[this.KINDS[card.dataset.kind].idAttr], 10);
+    }
 
-        const pfImages = this.getImagesForPointFort(pointFortNumber);
+    getCard(kind, number) {
+        const container = this.getContainer(kind);
+        if (!container) return null;
+        const cfg = this.KINDS[kind];
+        return Array.from(container.querySelectorAll(`.${cfg.cardClass}`))
+            .find(card => this.getCardNumber(card) === number) || null;
+    }
 
-        const titreVal = (pointFort && pointFort.titre) || '';
-        const constatVal = (pointFort && pointFort.constat) || '';
+    addPointFort(pointFort = null, options = {}) {
+        return this.addItem('pointfort', pointFort, options);
+    }
 
-        pfCard.innerHTML = `
-            <div class="item-card-header">
-                <h4>✅ Point fort ${pointFortNumber}</h4>
-                <button type="button" class="btn-remove" onclick="window.editor.removePointFort(this)">
-                    🗑️ Supprimer
+    addEcart(ecart = null, options = {}) {
+        return this.addItem('ecart', ecart, options);
+    }
+
+    addObservation(obs = null, options = {}) {
+        return this.addItem('observation', obs, options);
+    }
+
+    /**
+     * Ajoute une carte. options.collapsed : repliée ; options.isNew : ajout manuel
+     * (animation, défilement et focus sur le premier champ)
+     */
+    addItem(kind, item = null, options = {}) {
+        const cfg = this.KINDS[kind];
+        const container = this.getContainer(kind);
+        if (!container) return null;
+
+        this.dismissUndo();
+        this[cfg.counter]++;
+        const number = this[cfg.counter];
+
+        const card = document.createElement('article');
+        card.className = `item-card ${cfg.cardClass}`;
+        card.dataset.kind = kind;
+        card.dataset[cfg.idAttr] = number;
+        card.innerHTML = `
+            <header class="item-card__head">
+                <button type="button" class="item-card__toggle" data-action="toggle" aria-expanded="true">
+                    <span class="item-card__chevron" aria-hidden="true">${ICONS.chevron}</span>
+                    <span class="badge">${cfg.label} ${number}</span>
+                    <span class="item-card__summary"></span>
+                    <span class="item-card__meta"></span>
                 </button>
-            </div>
-
-            <div class="form-group">
-                <label>Titre</label>
-                <input type="text"
-                       class="pointfort-titre"
-                       value="${this.escapeHtmlInput(titreVal)}"
-                       placeholder="Ex: Standard bien appliqué / Bonne pratique observée">
-            </div>
-
-            <div class="form-group">
-                <label>Constat</label>
-                <textarea class="pointfort-constat"
-                          rows="4"
-                          placeholder="Décrivez le point fort observé...">${this.escapeHtmlTextarea(constatVal)}</textarea>
-            </div>
-
-            <div class="ecart-images-section">
-                <div class="ecart-images-header">
-                    <label>📸 Photos du point fort</label>
-                    <button type="button" class="btn-add-image" onclick="window.editor.triggerPointFortImageUpload(${pointFortNumber})">
-                        ➕ Ajouter une photo
-                    </button>
-                    <input type="file"
-                           class="pointfort-image-input"
-                           id="pointfort-image-input-${pointFortNumber}"
-                           accept="image/*,.heic,.HEIC"
-                           multiple
-                           style="display: none;"
-                           onchange="window.editor.handlePointFortImageUpload(${pointFortNumber}, event)">
-                </div>
-
-                <div class="ecart-images-grid" id="pointfort-images-${pointFortNumber}">
-                    ${this.renderPointFortImages(pfImages, pointFortNumber)}
+                <button type="button" class="icon-btn icon-btn--danger" data-action="remove"
+                        aria-label="Supprimer ${cfg.label.toLowerCase()} ${number}">${ICONS.trash}</button>
+            </header>
+            <div class="collapsible">
+                <div class="collapsible__inner">
+                    <div class="item-card__body">${this.renderCardFields(kind, item)}</div>
                 </div>
             </div>
         `;
 
-        if (this.pointsFortsContainer) this.pointsFortsContainer.appendChild(pfCard);
+        container.appendChild(card);
+        this.refreshImages(kind, number);
+        if (options.collapsed) this.setCollapsed(card, true);
 
-        console.log(`➕ Point fort ${pointFortNumber} ajouté avec ${pfImages.length} image(s)`);
+        if (options.isNew) {
+            card.classList.add('is-new');
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            const firstField = card.querySelector('input[type="text"], textarea');
+            if (firstField) firstField.focus({ preventScroll: true });
+        }
+
+        this.updateCounts();
+        return card;
     }
+
+    renderCardFields(kind, item) {
+        const value = (key) => this.escapeHtmlInput((item && item[key]) || '');
+        const text = (cls, key, label, placeholder) => `
+            <label class="form-group">
+                <span class="field-label">${label}</span>
+                <input type="text" class="${cls}" value="${value(key)}" placeholder="${placeholder}">
+            </label>`;
+        const area = (cls, key, label, placeholder, rows = 4) => `
+            <label class="form-group">
+                <span class="field-label">${label}</span>
+                <textarea class="${cls}" rows="${rows}" placeholder="${placeholder}">${value(key)}</textarea>
+            </label>`;
+        const owner = (prefix) => `
+            <div class="form-grid">
+                ${text(`${prefix}-responsable`, 'responsable', 'Responsable', 'Nom du responsable')}
+                ${text(`${prefix}-delai`, 'delai', 'Délai', 'Ex : 31/12/2026')}
+            </div>`;
+
+        if (kind === 'pointfort') {
+            return text('pointfort-titre', 'titre', 'Titre', 'Ex : Standard bien appliqué')
+                + area('pointfort-constat', 'constat', 'Constat', 'Décrivez le point fort observé')
+                + this.renderPhotoSection(kind);
+        }
+        if (kind === 'ecart') {
+            return text('ecart-exigence', 'exigence', 'Exigence', 'Ex : INS-2426 / Bonnes pratiques de fabrication')
+                + area('ecart-constat', 'constat', 'Constat', 'Décrivez le constat observé')
+                + this.renderPhotoSection(kind)
+                + text('ecart-action', 'action', 'Action corrective', 'Action à mettre en place')
+                + owner('ecart');
+        }
+        return area('observation-constat', 'constat', 'Constat', "Décrivez l'observation")
+            + this.renderPhotoSection(kind)
+            + area('observation-risque', 'risque', 'Risque associé', 'Décrivez le risque potentiel', 3)
+            + text('observation-action', 'action', 'Action', 'Action à mettre en place')
+            + owner('observation');
+    }
+
+    renderPhotoSection(kind) {
+        const prefix = this.KINDS[kind].prefix;
+        return `
+            <div class="photo-section">
+                <div class="photo-section__head">
+                    <span class="field-label">Photos</span>
+                    <button type="button" class="btn btn--secondary btn--sm btn-add-image" data-action="add-photo">
+                        ${ICONS.plus}<span>Ajouter</span>
+                    </button>
+                    <input type="file" class="${prefix}-image-input" accept="image/*,.heic,.HEIC" multiple hidden data-action="upload">
+                </div>
+                <div class="photo-grid ${prefix}-images-grid"></div>
+                <p class="field-help">Ou cliquez dans la carte puis Ctrl+V pour coller une capture.</p>
+            </div>
+        `;
+    }
+
+    renderPhoto(img) {
+        const bytes = img.size || (img.base64.length * 3 / 4);
+        return `
+            <figure class="photo" data-image-id="${this.escapeHtmlInput(img.id)}">
+                <button type="button" class="photo__open" data-action="open-photo" aria-label="Agrandir la photo">
+                    <img src="${this.escapeHtmlInput(img.base64)}" alt="${this.escapeHtmlInput(img.alt || 'Photo')}">
+                </button>
+                <button type="button" class="icon-btn photo__delete" data-action="remove-photo" aria-label="Supprimer la photo">${ICONS.trash}</button>
+                <input type="text" class="photo__caption" placeholder="Légende" aria-label="Légende"
+                       value="${this.escapeHtmlInput(img.alt || img.caption || '')}" data-action="caption">
+                <figcaption class="photo__size">${Math.round(bytes / 1024)} Ko</figcaption>
+            </figure>
+        `;
+    }
+
+    getImages(kind, number) {
+        const key = this.KINDS[kind].imageKey;
+        const images = (this.currentData && this.currentData.images) || [];
+        return images.filter(img => img[key] === number);
+    }
+
+    refreshImages(kind, number) {
+        const card = this.getCard(kind, number);
+        if (!card) return;
+        card.querySelector('.photo-grid').innerHTML =
+            this.getImages(kind, number).map(img => this.renderPhoto(img)).join('');
+        this.updateCardSummary(card);
+    }
+
+    // Conservés pour le collage Ctrl+V
+    refreshPointFortImages(number) { this.refreshImages('pointfort', number); }
+    refreshEcartImages(number) { this.refreshImages('ecart', number); }
+    refreshObservationImages(number) { this.refreshImages('observation', number); }
+
+    updateCardSummary(card) {
+        const kind = card.dataset.kind;
+        const field = card.querySelector(this.KINDS[kind].summaryField);
+        const text = field ? field.value.trim().replace(/\s+/g, ' ') : '';
+        const summary = card.querySelector('.item-card__summary');
+        summary.textContent = text || 'Sans titre';
+        summary.classList.toggle('is-empty', !text);
+
+        const count = this.getImages(kind, this.getCardNumber(card)).length;
+        card.querySelector('.item-card__meta').textContent =
+            count ? `${count} photo${count > 1 ? 's' : ''}` : '';
+    }
+
+    setCollapsed(card, collapsed) {
+        card.classList.toggle('is-collapsed', collapsed);
+        card.querySelector('.item-card__toggle').setAttribute('aria-expanded', String(!collapsed));
+    }
+
+    async handleImageUpload(kind, number, input) {
+        const files = Array.from(input.files || []);
+        if (files.length === 0) return;
+
+        this.dismissUndo();
+        if (!this.currentData) this.currentData = { images: [] };
+        if (!this.currentData.images) this.currentData.images = [];
+
+        // Vignettes provisoires pendant la conversion HEIC / compression
+        const card = this.getCard(kind, number);
+        const grid = card && card.querySelector('.photo-grid');
+        files.forEach(() => {
+            const placeholder = document.createElement('div');
+            placeholder.className = 'photo photo--loading skeleton';
+            if (grid) grid.appendChild(placeholder);
+        });
+
+        for (const file of files) {
+            try {
+                const processedFile = await this.convertHeicIfNeeded(file);
+                // Redimensionnée + recompressée (une photo de 4 Mo passe à ~300 Ko)
+                const compressed = await ImageCompressor.compressFile(processedFile);
+                this.currentData.images.push({
+                    id: `img-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+                    base64: compressed.base64,
+                    alt: file.name.replace(/\.[^/.]+$/, ''),
+                    contentType: compressed.contentType,
+                    size: compressed.size,
+                    [this.KINDS[kind].imageKey]: number,
+                    caption: ''
+                });
+            } catch (error) {
+                console.error(`❌ Erreur upload ${file.name}:`, error);
+                showToast(`Impossible d'ajouter ${file.name} : ${error.message}`, { tone: 'danger', duration: 6000 });
+            }
+        }
+
+        input.value = '';
+        this.refreshImages(kind, number);
+    }
+
+    removeImage(kind, number, imageId) {
+        const index = this.findImageIndexById(imageId);
+        if (index === -1) return;
+
+        const [removed] = this.currentData.images.splice(index, 1);
+        this.refreshImages(kind, number);
+
+        this.offerUndo('Photo supprimée', () => {
+            this.currentData.images.splice(index, 0, removed);
+            this.refreshImages(kind, removed[this.KINDS[kind].imageKey]);
+        });
+    }
+
+    /**
+     * Supprime une carte et ses photos, avec « Annuler » pendant quelques secondes
+     */
+    removeItem(card) {
+        const kind = card.dataset.kind;
+        const cfg = this.KINDS[kind];
+        const container = this.getContainer(kind);
+        const number = this.getCardNumber(card);
+        const position = Array.from(container.children).indexOf(card);
+        const imagesSnapshot = ((this.currentData && this.currentData.images) || []).map(img => ({ ...img }));
+
+        if (this.currentData && this.currentData.images) {
+            this.currentData.images = this.currentData.images.filter(img => img[cfg.imageKey] !== number);
+        }
+        card.remove();
+        this.renumber(kind, { remapImages: true });
+
+        const label = `${cfg.label} ${number} ${kind === 'observation' ? 'supprimée' : 'supprimé'}`;
+        this.offerUndo(label, () => {
+            container.insertBefore(card, container.children[position] || null);
+            if (this.currentData) this.currentData.images = imagesSnapshot;
+            // Les photos ont retrouvé leur numérotation d'origine : seules les cartes sont renumérotées
+            this.renumber(kind, { remapImages: false });
+        });
+    }
+
+    /**
+     * Renumérote les cartes selon leur position (1..n).
+     * remapImages : reporte l'ancien numéro des photos sur le nouveau (après suppression)
+     */
+    renumber(kind, { remapImages }) {
+        const cfg = this.KINDS[kind];
+        const cards = Array.from(this.getContainer(kind).querySelectorAll(`.${cfg.cardClass}`));
+
+        cards.forEach((card, index) => {
+            const newNumber = index + 1;
+            const oldNumber = this.getCardNumber(card);
+            if (remapImages && oldNumber !== newNumber && this.currentData && this.currentData.images) {
+                this.currentData.images.forEach(img => {
+                    if (img[cfg.imageKey] === oldNumber) img[cfg.imageKey] = newNumber;
+                });
+            }
+            card.dataset[cfg.idAttr] = newNumber;
+            card.querySelector('.badge').textContent = `${cfg.label} ${newNumber}`;
+            card.querySelector('[data-action="remove"]')
+                .setAttribute('aria-label', `Supprimer ${cfg.label.toLowerCase()} ${newNumber}`);
+        });
+
+        cards.forEach((card, index) => this.refreshImages(kind, index + 1));
+        this[cfg.counter] = cards.length;
+        this.updateCounts();
+    }
+
+    offerUndo(message, undo) {
+        this.dismissUndo();
+        this.pendingUndo = showToast(message, { actionLabel: 'Annuler', onAction: undo, duration: 6000 });
+    }
+
+    // Toute nouvelle modification de structure rend l'annulation précédente caduque
+    dismissUndo() {
+        if (this.pendingUndo) this.pendingUndo.dismiss();
+        this.pendingUndo = null;
+    }
+
+    updateCounts() {
+        const counts = {};
+        Object.keys(this.KINDS).forEach(kind => {
+            const container = this.getContainer(kind);
+            counts[kind] = container ? container.querySelectorAll(`.${this.KINDS[kind].cardClass}`).length : 0;
+        });
+
+        document.querySelectorAll('[data-count]').forEach(el => {
+            el.textContent = counts[el.dataset.count] || 0;
+        });
+
+        const s = (n) => (n > 1 ? 's' : '');
+        const status = document.getElementById('formStatus');
+        if (status) {
+            status.textContent = [
+                `${counts.pointfort} point${s(counts.pointfort)} fort${s(counts.pointfort)}`,
+                `${counts.ecart} écart${s(counts.ecart)}`,
+                `${counts.observation} observation${s(counts.observation)}`
+            ].join(' · ');
+        }
+    }
+
+    attachCardListeners() {
+        this.form.addEventListener('submit', (e) => e.preventDefault());
+
+        this.form.addEventListener('click', (e) => {
+            const actionEl = e.target.closest('[data-action]');
+            const card = actionEl && actionEl.closest('.item-card');
+            if (!card) return;
+
+            const kind = card.dataset.kind;
+            const number = this.getCardNumber(card);
+
+            switch (actionEl.dataset.action) {
+                case 'toggle':
+                    this.setCollapsed(card, !card.classList.contains('is-collapsed'));
+                    break;
+                case 'remove':
+                    this.removeItem(card);
+                    break;
+                case 'add-photo':
+                    card.querySelector('input[data-action="upload"]').click();
+                    break;
+                case 'open-photo':
+                    this.openImageLightbox(actionEl.querySelector('img').src);
+                    break;
+                case 'remove-photo':
+                    this.removeImage(kind, number, actionEl.closest('[data-image-id]').dataset.imageId);
+                    break;
+            }
+        });
+
+        this.form.addEventListener('change', (e) => {
+            const el = e.target;
+            if (el.matches('input[data-action="upload"]')) {
+                const card = el.closest('.item-card');
+                this.handleImageUpload(card.dataset.kind, this.getCardNumber(card), el);
+            } else if (el.matches('[data-action="caption"]')) {
+                this.updateImageCaption(el.closest('[data-image-id]').dataset.imageId, el.value);
+            }
+        });
+
+        this.form.addEventListener('input', (e) => {
+            const card = e.target.closest('.item-card');
+            if (card && e.target.matches(this.KINDS[card.dataset.kind].summaryField)) {
+                this.updateCardSummary(card);
+            }
+        });
+    }
+
+    /**
+     * Sommaire latéral : section visible mise en évidence au défilement
+     */
+    initSectionNav() {
+        const links = Array.from(document.querySelectorAll('.section-nav a[href^="#"]'));
+        if (links.length === 0 || typeof IntersectionObserver === 'undefined') return;
+
+        const byId = new Map(links.map(link => [link.getAttribute('href').slice(1), link]));
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (!entry.isIntersecting) return;
+                links.forEach(link => link.classList.remove('is-active'));
+                const link = byId.get(entry.target.id);
+                if (link) link.classList.add('is-active');
+            });
+        }, { rootMargin: '-30% 0px -60% 0px' });
+
+        byId.forEach((link, id) => {
+            const section = document.getElementById(id);
+            if (section) observer.observe(section);
+        });
+    }
+
+    showForm() {
+        this.form.hidden = false;
+        if (this.editEmpty) this.editEmpty.hidden = true;
+        this.updateCounts();
+    }
+
+
 
     /**
      * Échappe une valeur injectée via innerHTML (attribut ou contenu).
@@ -348,11 +733,13 @@ class AuditEditor {
         return Array.isArray(cfg.planActionRecipients) ? cfg.planActionRecipients : [];
     }
 
+
     rememberPlanActionRecipients(recipients) {
         try {
             localStorage.setItem(this.RECIPIENTS_STORAGE_KEY, JSON.stringify(recipients));
         } catch (e) { /* non bloquant */ }
     }
+
 
     escapeHtmlInput(str) {
         if (str === null || str === undefined) return '';
@@ -364,567 +751,11 @@ class AuditEditor {
             .replace(/>/g, '&gt;');
     }
 
+
     escapeHtmlTextarea(str) {
         return this.escapeHtmlInput(str);
     }
 
-    getImagesForPointFort(pointFortNumber) {
-        if (!this.currentData || !this.currentData.images) return [];
-        return this.currentData.images.filter(img => img.pointFortNumber === pointFortNumber);
-    }
-
-    renderPointFortImages(images, pointFortNumber) {
-        if (!images || images.length === 0) return '';
-
-        return images.map((img) => {
-            const sizeKB = img.size
-                ? (img.size / 1024).toFixed(1)
-                : ((img.base64.length * 3 / 4) / 1024).toFixed(1);
-
-            return `
-                <div class="ecart-image-item" data-image-id="${this.escapeHtmlInput(img.id)}">
-                    <img src="${this.escapeHtmlInput(img.base64)}"
-                         alt="${this.escapeHtmlInput(img.alt || 'Image')}"
-                         class="ecart-image-preview"
-                         onclick="window.editor.openImageLightbox(this.src)">
-
-                    <input type="text"
-                           class="ecart-image-caption"
-                           placeholder="Légende..."
-                           value="${this.escapeHtmlInput(img.alt || img.caption || '')}"
-                           onchange="window.editor.updateImageCaption(this.closest('[data-image-id]').dataset.imageId, this.value)">
-
-                    <button type="button"
-                            class="ecart-image-delete"
-                            onclick="window.editor.removePointFortImage(${pointFortNumber}, this.closest('[data-image-id]').dataset.imageId)">
-                        🗑️ Supprimer
-                    </button>
-
-                    <div class="ecart-image-size">📊 ${sizeKB} KB</div>
-                </div>
-            `;
-        }).join('');
-    }
-
-    triggerPointFortImageUpload(pointFortNumber) {
-        const input = document.getElementById(`pointfort-image-input-${pointFortNumber}`);
-        if (input) input.click();
-    }
-
-    async handlePointFortImageUpload(pointFortNumber, event) {
-        const files = event.target.files;
-        if (!files || files.length === 0) return;
-
-        console.log(`📤 Upload de ${files.length} image(s) pour le point fort ${pointFortNumber}...`);
-
-        if (!this.currentData.images) this.currentData.images = [];
-
-        for (let file of files) {
-            try {
-                const processedFile = await this.convertHeicIfNeeded(file);
-                // Redimensionnée + recompressée (une photo de 4 Mo passe à ~300 Ko)
-                const compressed = await ImageCompressor.compressFile(processedFile);
-
-                const imageData = {
-                    id: `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                    base64: compressed.base64,
-                    alt: file.name.replace(/\.[^/.]+$/, ''),
-                    contentType: compressed.contentType,
-                    size: compressed.size,
-                    pointFortNumber: pointFortNumber,
-                    caption: ''
-                };
-
-                this.currentData.images.push(imageData);
-                console.log(`✅ Image ajoutée au point fort ${pointFortNumber}: ${file.name}`);
-            } catch (error) {
-                console.error(`❌ Erreur upload ${file.name}:`, error);
-                alert(`❌ Erreur lors du traitement de ${file.name}:\n${error.message}`);
-            }
-        }
-
-        this.refreshPointFortImages(pointFortNumber);
-        event.target.value = '';
-    }
-
-    refreshPointFortImages(pointFortNumber) {
-        const container = document.getElementById(`pointfort-images-${pointFortNumber}`);
-        if (!container) return;
-
-        const images = this.getImagesForPointFort(pointFortNumber);
-        container.innerHTML = this.renderPointFortImages(images, pointFortNumber);
-
-        console.log(`🔄 Images du point fort ${pointFortNumber} rafraîchies: ${images.length} image(s)`);
-    }
-
-    removePointFortImage(pointFortNumber, imageId) {
-        if (!confirm('⚠️ Supprimer cette image ?')) return;
-
-        const index = this.findImageIndexById(imageId);
-        if (index !== -1) {
-            this.currentData.images.splice(index, 1);
-            this.refreshPointFortImages(pointFortNumber);
-        }
-    }
-
-    removePointFort(button) {
-        if (!confirm('⚠️ Supprimer ce point fort et ses images associées ?')) return;
-
-        const pfCard = button.closest('.pointfort-card');
-        const pfNumber = parseInt(pfCard.dataset.pointfortId);
-
-        console.log(`🗑️ Suppression point fort ${pfNumber}`);
-
-        if (this.currentData && this.currentData.images) {
-            this.currentData.images = this.currentData.images.filter(
-                img => img.pointFortNumber !== pfNumber
-            );
-            console.log(`  ✅ Images du point fort ${pfNumber} supprimées`);
-        }
-
-        pfCard.remove();
-        this.reindexPointsForts();
-    }
-
-    reindexPointsForts() {
-        const pfCards = this.pointsFortsContainer ? this.pointsFortsContainer.querySelectorAll('.pointfort-card') : [];
-
-        pfCards.forEach((card, index) => {
-            const newNumber = index + 1;
-            const oldNumber = parseInt(card.dataset.pointfortId);
-
-            card.dataset.pointfortId = newNumber;
-
-            const title = card.querySelector('h4');
-            if (title) title.textContent = `✅ Point fort ${newNumber}`;
-
-            if (this.currentData && this.currentData.images) {
-                this.currentData.images.forEach(img => {
-                    if (img.pointFortNumber === oldNumber) img.pointFortNumber = newNumber;
-                });
-            }
-
-            const imageInput = card.querySelector('.pointfort-image-input');
-            if (imageInput) {
-                imageInput.id = `pointfort-image-input-${newNumber}`;
-                imageInput.setAttribute('onchange', `window.editor.handlePointFortImageUpload(${newNumber}, event)`);
-            }
-
-            const addBtn = card.querySelector('.btn-add-image');
-            if (addBtn) {
-                addBtn.setAttribute('onclick', `window.editor.triggerPointFortImageUpload(${newNumber})`);
-            }
-
-            const imagesGrid = card.querySelector('.ecart-images-grid');
-            if (imagesGrid) {
-                imagesGrid.id = `pointfort-images-${newNumber}`;
-                this.refreshPointFortImages(newNumber);
-            }
-        });
-
-        this.pointFortCounter = pfCards.length;
-        console.log(`🔄 Points forts réindexés: ${this.pointFortCounter} point(s) fort(s)`);
-    }
-
-    // =====================================================
-    // ÉCARTS / OBSERVATIONS (inchangés)
-    // =====================================================
-
-    /**
-     * Ajoute un écart au formulaire
-     */
-    addEcart(ecart = null) {
-        this.ecartCounter++;
-        const ecartNumber = this.ecartCounter;
-
-        const ecartCard = document.createElement('div');
-        ecartCard.className = 'item-card ecart-card';
-        ecartCard.dataset.ecartId = ecartNumber;
-
-        // Récupérer les images associées à cet écart
-        const ecartImages = this.getImagesForEcart(ecartNumber);
-
-        const exigenceVal = (ecart && ecart.exigence) || '';
-        const constatVal = (ecart && ecart.constat) || '';
-        const actionVal = (ecart && ecart.action) || '';
-        const responsableVal = (ecart && ecart.responsable) || '';
-        const delaiVal = (ecart && ecart.delai) || '';
-
-        ecartCard.innerHTML = `
-            <div class="item-card-header">
-                <h4>⚠️ Écart ${ecartNumber}</h4>
-                <button type="button" class="btn-remove" onclick="window.editor.removeEcart(this)">
-                    🗑️ Supprimer
-                </button>
-            </div>
-            
-            <div class="form-group">
-                <label>Exigence</label>
-                <input type="text" 
-                       class="ecart-exigence" 
-                       value="${this.escapeHtmlInput(exigenceVal)}"
-                       placeholder="Ex: INS-2426 / Bonnes pratiques de fabrication">
-            </div>
-            
-            <div class="form-group">
-                <label>Constat</label>
-                <textarea class="ecart-constat" 
-                          rows="4" 
-                          placeholder="Décrivez le constat observé...">${this.escapeHtmlTextarea(constatVal)}</textarea>
-            </div>
-            
-            <!-- ✅ SECTION IMAGES POUR CET ÉCART -->
-            <div class="ecart-images-section">
-                <div class="ecart-images-header">
-                    <label>📸 Photos du constat</label>
-                    <button type="button" class="btn-add-image" onclick="window.editor.triggerImageUpload(${ecartNumber})">
-                        ➕ Ajouter une photo
-                    </button>
-                    <input type="file" 
-                           class="ecart-image-input" 
-                           id="ecart-image-input-${ecartNumber}"
-                           accept="image/*,.heic,.HEIC" 
-                           multiple 
-                           style="display: none;"
-                           onchange="window.editor.handleEcartImageUpload(${ecartNumber}, event)">
-                </div>
-                
-                <div class="ecart-images-grid" id="ecart-images-${ecartNumber}">
-                    ${this.renderEcartImages(ecartImages, ecartNumber)}
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <label>Action corrective</label>
-                <input type="text" 
-                       class="ecart-action" 
-                       value="${this.escapeHtmlInput(actionVal)}"
-                       placeholder="Action à mettre en place">
-            </div>
-            
-            <div class="form-grid">
-                <div class="form-group">
-                    <label>Responsable</label>
-                    <input type="text" 
-                           class="ecart-responsable" 
-                           value="${this.escapeHtmlInput(responsableVal)}"
-                           placeholder="Nom du responsable">
-                </div>
-                <div class="form-group">
-                    <label>Délai</label>
-                    <input type="text" 
-                           class="ecart-delai" 
-                           value="${this.escapeHtmlInput(delaiVal)}"
-                           placeholder="Ex: 31/12/2024">
-                </div>
-            </div>
-        `;
-
-        this.ecartsContainer.appendChild(ecartCard);
-
-        console.log(`➕ Écart ${ecartNumber} ajouté avec ${ecartImages.length} image(s)`);
-    }
-
-    /**
-     * Ajoute une observation au formulaire
-     */
-    addObservation(obs = null) {
-        this.observationCounter++;
-        const obsNumber = this.observationCounter;
-
-        const obsCard = document.createElement('div');
-        obsCard.className = 'item-card observation-card';
-        obsCard.dataset.observationId = obsNumber;
-
-        const obsImages = this.getImagesForObservation(obsNumber);
-
-        const constatVal = (obs && obs.constat) || '';
-        const risqueVal = (obs && obs.risque) || '';
-        const actionVal = (obs && obs.action) || '';
-        const responsableVal = (obs && obs.responsable) || '';
-        const delaiVal = (obs && obs.delai) || '';
-
-        obsCard.innerHTML = `
-			<div class="item-card-header">
-				<h4>👁️ Observation ${obsNumber}</h4>
-				<button type="button" class="btn-remove" onclick="window.editor.removeObservation(this)">
-					🗑️ Supprimer
-				</button>
-			</div>
-
-			<div class="form-group">
-				<label>Constat *</label>
-				<textarea class="observation-constat"
-						  rows="4"
-						  placeholder="Décrivez l'observation..."
-						  required>${this.escapeHtmlTextarea(constatVal)}</textarea>
-			</div>
-
-			<div class="observation-images-section">
-				<div class="observation-images-header">
-					<label>📸 Photos de l'observation</label>
-					<button type="button" class="btn-add-image" onclick="window.editor.triggerObservationImageUpload(${obsNumber})">
-						➕ Ajouter une photo
-					</button>
-					<input type="file"
-						   class="observation-image-input"
-						   id="observation-image-input-${obsNumber}"
-						   accept="image/*,.heic,.HEIC"
-						   multiple
-						   style="display: none;"
-						   onchange="window.editor.handleObservationImageUpload(${obsNumber}, event)">
-				</div>
-
-				<div class="observation-images-grid" id="observation-images-${obsNumber}">
-					${this.renderObservationImages(obsImages, obsNumber)}
-				</div>
-			</div>
-
-			<div class="form-group">
-				<label>Risque associé</label>
-				<textarea class="observation-risque"
-						  rows="3"
-						  placeholder="Décrivez le risque potentiel...">${this.escapeHtmlTextarea(risqueVal)}</textarea>
-			</div>
-
-			<div class="form-group">
-				<label>Action</label>
-				<input type="text"
-					   class="observation-action"
-					   value="${this.escapeHtmlInput(actionVal)}"
-					   placeholder="Action à mettre en place">
-			</div>
-
-			<div class="form-grid">
-				<div class="form-group">
-					<label>Responsable</label>
-					<input type="text"
-						   class="observation-responsable"
-						   value="${this.escapeHtmlInput(responsableVal)}"
-						   placeholder="Nom du responsable">
-				</div>
-				<div class="form-group">
-					<label>Délai</label>
-					<input type="text"
-						   class="observation-delai"
-						   value="${this.escapeHtmlInput(delaiVal)}"
-						   placeholder="Ex: 31/12/2024">
-				</div>
-			</div>
-		`;
-
-        this.observationsContainer.appendChild(obsCard);
-
-        console.log(`➕ Observation ${obsNumber} ajoutée avec ${obsImages.length} image(s)`);
-    }
-
-    /**
-     * Récupère les images associées à une observation
-     */
-    getImagesForObservation(observationNumber) {
-        if (!this.currentData || !this.currentData.images) return [];
-
-        return this.currentData.images.filter(img => img.observationNumber === observationNumber);
-    }
-
-    /**
-     * Rend le HTML des images d'une observation
-     */
-    renderObservationImages(images, observationNumber) {
-        if (!images || images.length === 0) return '';
-
-        return images.map((img) => {
-            const sizeKB = img.size
-                ? (img.size / 1024).toFixed(1)
-                : ((img.base64.length * 3 / 4) / 1024).toFixed(1);
-
-            return `
-                <div class="observation-image-item" data-image-id="${this.escapeHtmlInput(img.id)}">
-                    <img src="${this.escapeHtmlInput(img.base64)}" 
-                         alt="${this.escapeHtmlInput(img.alt || 'Image')}" 
-                         class="observation-image-preview"
-                         onclick="window.editor.openImageLightbox(this.src)">
-                    
-                    <input type="text" 
-                           class="observation-image-caption" 
-                           placeholder="Légende..."
-                           value="${this.escapeHtmlInput(img.alt || img.caption || '')}"
-                           onchange="window.editor.updateImageCaption(this.closest('[data-image-id]').dataset.imageId, this.value)">
-                    
-                    <button type="button" 
-                            class="observation-image-delete" 
-                            onclick="window.editor.removeObservationImage(${observationNumber}, this.closest('[data-image-id]').dataset.imageId)">
-                        🗑️ Supprimer
-                    </button>
-                    
-                    <div class="observation-image-size">📊 ${sizeKB} KB</div>
-                </div>
-            `;
-        }).join('');
-    }
-
-    /**
-     * Déclenche l'upload d'image pour une observation
-     */
-    triggerObservationImageUpload(observationNumber) {
-        const input = document.getElementById(`observation-image-input-${observationNumber}`);
-        if (input) {
-            input.click();
-        }
-    }
-
-    /**
-     * ✅ HEIC : Gère l'upload d'images pour une observation spécifique (AVEC CONVERSION HEIC)
-     */
-    async handleObservationImageUpload(observationNumber, event) {
-        const files = event.target.files;
-
-        if (!files || files.length === 0) return;
-
-        console.log(`📤 Upload de ${files.length} image(s) pour l'observation ${observationNumber}...`);
-
-        // Initialiser images si besoin
-        if (!this.currentData.images) {
-            this.currentData.images = [];
-        }
-
-        for (let file of files) {
-            try {
-                // ✅ HEIC : Conversion automatique si nécessaire
-                const processedFile = await this.convertHeicIfNeeded(file);
-
-                // Redimensionnée + recompressée (une photo de 4 Mo passe à ~300 Ko)
-                const compressed = await ImageCompressor.compressFile(processedFile);
-
-                const imageData = {
-                    id: `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                    base64: compressed.base64,
-                    alt: file.name.replace(/\.[^/.]+$/, ''),
-                    contentType: compressed.contentType,
-                    size: compressed.size,
-                    observationNumber: observationNumber,
-                    caption: ''
-                };
-
-                this.currentData.images.push(imageData);
-
-                console.log(`✅ Image ajoutée à l'observation ${observationNumber}: ${file.name}`);
-
-            } catch (error) {
-                console.error(`❌ Erreur upload ${file.name}:`, error);
-                alert(`❌ Erreur lors du traitement de ${file.name}:\n${error.message}`);
-            }
-        }
-
-        // Rafraîchir l'affichage des images pour cette observation
-        this.refreshObservationImages(observationNumber);
-
-        // Reset input
-        event.target.value = '';
-    }
-
-    /**
-     * Rafraîchit l'affichage des images d'une observation
-     */
-    refreshObservationImages(observationNumber) {
-        const container = document.getElementById(`observation-images-${observationNumber}`);
-        if (!container) return;
-
-        const images = this.getImagesForObservation(observationNumber);
-        container.innerHTML = this.renderObservationImages(images, observationNumber);
-
-        console.log(`🔄 Images de l'observation ${observationNumber} rafraîchies: ${images.length} image(s)`);
-    }
-
-    /**
-     * Supprime une image d'une observation
-     */
-    removeObservationImage(observationNumber, imageId) {
-        if (!confirm('⚠️ Supprimer cette image ?')) return;
-
-        const index = this.findImageIndexById(imageId);
-        if (index !== -1) {
-            this.currentData.images.splice(index, 1);
-            this.refreshObservationImages(observationNumber);
-        }
-    }
-
-    /**
-     * Supprime une observation (gérer aussi les images)
-     */
-    removeObservation(button) {
-        if (!confirm('⚠️ Supprimer cette observation et ses images associées ?')) return;
-
-        const obsCard = button.closest('.observation-card');
-        const obsNumber = parseInt(obsCard.dataset.observationId);
-
-        console.log(`🗑️ Suppression observation ${obsNumber}`);
-
-        // Supprimer les images associées
-        if (this.currentData && this.currentData.images) {
-            this.currentData.images = this.currentData.images.filter(
-                img => img.observationNumber !== obsNumber
-            );
-            console.log(`  ✅ Images de l'observation ${obsNumber} supprimées`);
-        }
-
-        // Supprimer la carte
-        obsCard.remove();
-
-        // Réindexer les observations restantes
-        this.reindexObservations();
-    }
-
-    /**
-     * Réindexe les observations après suppression
-     */
-    reindexObservations() {
-        const obsCards = this.observationsContainer.querySelectorAll('.observation-card');
-
-        obsCards.forEach((card, index) => {
-            const newNumber = index + 1;
-            const oldNumber = parseInt(card.dataset.observationId);
-
-            // Mettre à jour le data-attribute
-            card.dataset.observationId = newNumber;
-
-            // Mettre à jour le titre
-            const title = card.querySelector('h4');
-            if (title) {
-                title.textContent = `👁️ Observation ${newNumber}`;
-            }
-
-            // Mettre à jour les numéros d'observation dans les images
-            if (this.currentData && this.currentData.images) {
-                this.currentData.images.forEach(img => {
-                    if (img.observationNumber === oldNumber) {
-                        img.observationNumber = newNumber;
-                    }
-                });
-            }
-
-            // Mettre à jour les IDs et onclick
-            const imageInput = card.querySelector('.observation-image-input');
-            if (imageInput) {
-                imageInput.id = `observation-image-input-${newNumber}`;
-                imageInput.setAttribute('onchange', `window.editor.handleObservationImageUpload(${newNumber}, event)`);
-            }
-
-            const addBtn = card.querySelector('.btn-add-image');
-            if (addBtn) {
-                addBtn.setAttribute('onclick', `window.editor.triggerObservationImageUpload(${newNumber})`);
-            }
-
-            const imagesGrid = card.querySelector('.observation-images-grid');
-            if (imagesGrid) {
-                imagesGrid.id = `observation-images-${newNumber}`;
-                this.refreshObservationImages(newNumber);
-            }
-        });
-
-        this.observationCounter = obsCards.length;
-        console.log(`🔄 Observations réindexées: ${this.observationCounter} observation(s)`);
-    }
 
     /**
      * Collecte les données du formulaire
@@ -1041,6 +872,7 @@ class AuditEditor {
         return data;
     }
 
+
     /**
      * Sauvegarde et prévisualise
      */
@@ -1075,6 +907,7 @@ class AuditEditor {
         }
     }
 
+
     /**
      * Exporte le JSON édité
      */
@@ -1097,8 +930,10 @@ class AuditEditor {
 
         URL.revokeObjectURL(url);
 
+        showToast(`JSON exporté : ${fileName}`);
         console.log(`✅ JSON exporté : ${fileName}`);
     }
+
 
     /**
      * Réinitialise le formulaire
@@ -1115,11 +950,15 @@ class AuditEditor {
             this.pointFortCounter = 0;
             this.ecartCounter = 0;
             this.observationCounter = 0;
-            this.currentData = null;
+            // Objet vide (et non null) : l'ajout de photos reste possible après réinitialisation
+            this.currentData = { images: [] };
+            this.dismissUndo();
+            this.updateCounts();
 
             console.log('✅ Formulaire réinitialisé');
         }
     }
+
 
     /**
      * ✅ NOUVEAU : Charge un fichier JSON depuis le disque
@@ -1166,7 +1005,7 @@ class AuditEditor {
                 this.currentData = data;
                 if (!Array.isArray(this.currentData.pointsForts)) this.currentData.pointsForts = [];
                 this.populateForm(this.currentData);
-                this.form.style.display = 'block';
+                this.showForm();
 
                 // Scroll vers le formulaire
                 this.form.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1183,6 +1022,7 @@ class AuditEditor {
         input.click();
     }
 
+
     /**
      * ✅ NOUVEAU : Lit un fichier texte (helper)
      */
@@ -1195,50 +1035,6 @@ class AuditEditor {
         });
     }
 
-    /**
-     * Récupère les images associées à un écart
-     */
-    getImagesForEcart(ecartNumber) {
-        if (!this.currentData || !this.currentData.images) return [];
-
-        return this.currentData.images.filter(img => img.ecartNumber === ecartNumber);
-    }
-
-    /**
-     * Rend le HTML des images d'un écart
-     */
-    renderEcartImages(images, ecartNumber) {
-        if (!images || images.length === 0) return '';
-
-        return images.map((img) => {
-            const sizeKB = img.size
-                ? (img.size / 1024).toFixed(1)
-                : ((img.base64.length * 3 / 4) / 1024).toFixed(1);
-
-            return `
-                <div class="ecart-image-item" data-image-id="${this.escapeHtmlInput(img.id)}">
-                    <img src="${this.escapeHtmlInput(img.base64)}" 
-                         alt="${this.escapeHtmlInput(img.alt || 'Image')}" 
-                         class="ecart-image-preview"
-                         onclick="window.editor.openImageLightbox(this.src)">
-                    
-                    <input type="text" 
-                           class="ecart-image-caption" 
-                           placeholder="Légende..."
-                           value="${this.escapeHtmlInput(img.alt || img.caption || '')}"
-                           onchange="window.editor.updateImageCaption(this.closest('[data-image-id]').dataset.imageId, this.value)">
-                    
-                    <button type="button" 
-                            class="ecart-image-delete" 
-                            onclick="window.editor.removeEcartImage(${ecartNumber}, this.closest('[data-image-id]').dataset.imageId)">
-                        🗑️ Supprimer
-                    </button>
-                    
-                    <div class="ecart-image-size">📊 ${sizeKB} KB</div>
-                </div>
-            `;
-        }).join('');
-    }
 
     /**
      * Trouve l'index d'une image par son id
@@ -1247,6 +1043,7 @@ class AuditEditor {
         if (!this.currentData || !this.currentData.images) return -1;
         return this.currentData.images.findIndex(img => img.id === imageId);
     }
+
 
     /**
      * Garantit un id unique par image (JSON externes : id absent ou dupliqué)
@@ -1261,91 +1058,6 @@ class AuditEditor {
         });
     }
 
-    /**
-     * Déclenche l'upload d'image pour un écart
-     */
-    triggerImageUpload(ecartNumber) {
-        const input = document.getElementById(`ecart-image-input-${ecartNumber}`);
-        if (input) {
-            input.click();
-        }
-    }
-
-    /**
-     * ✅ HEIC : Gère l'upload d'images pour un écart spécifique (AVEC CONVERSION HEIC)
-     */
-    async handleEcartImageUpload(ecartNumber, event) {
-        const files = event.target.files;
-
-        if (!files || files.length === 0) return;
-
-        console.log(`📤 Upload de ${files.length} image(s) pour l'écart ${ecartNumber}...`);
-
-        // Initialiser images si besoin
-        if (!this.currentData.images) {
-            this.currentData.images = [];
-        }
-
-        for (let file of files) {
-            try {
-                // ✅ HEIC : Conversion automatique si nécessaire
-                const processedFile = await this.convertHeicIfNeeded(file);
-
-                // Redimensionnée + recompressée (une photo de 4 Mo passe à ~300 Ko)
-                const compressed = await ImageCompressor.compressFile(processedFile);
-
-                const imageData = {
-                    id: `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                    base64: compressed.base64,
-                    alt: file.name.replace(/\.[^/.]+$/, ''),
-                    contentType: compressed.contentType,
-                    size: compressed.size,
-                    ecartNumber: ecartNumber,
-                    caption: ''
-                };
-
-                this.currentData.images.push(imageData);
-
-                console.log(`✅ Image ajoutée à l'écart ${ecartNumber}: ${file.name}`);
-
-            } catch (error) {
-                console.error(`❌ Erreur upload ${file.name}:`, error);
-                alert(`❌ Erreur lors du traitement de ${file.name}:\n${error.message}`);
-            }
-        }
-
-        // Rafraîchir l'affichage des images pour cet écart
-        this.refreshEcartImages(ecartNumber);
-
-        // Reset input
-        event.target.value = '';
-    }
-
-    /**
-     * Rafraîchit l'affichage des images d'un écart
-     */
-    refreshEcartImages(ecartNumber) {
-        const container = document.getElementById(`ecart-images-${ecartNumber}`);
-        if (!container) return;
-
-        const images = this.getImagesForEcart(ecartNumber);
-        container.innerHTML = this.renderEcartImages(images, ecartNumber);
-
-        console.log(`🔄 Images de l'écart ${ecartNumber} rafraîchies: ${images.length} image(s)`);
-    }
-
-    /**
-     * Supprime une image d'un écart
-     */
-    removeEcartImage(ecartNumber, imageId) {
-        if (!confirm('⚠️ Supprimer cette image ?')) return;
-
-        const index = this.findImageIndexById(imageId);
-        if (index !== -1) {
-            this.currentData.images.splice(index, 1);
-            this.refreshEcartImages(ecartNumber);
-        }
-    }
 
     /**
      * Met à jour la légende d'une image
@@ -1358,6 +1070,7 @@ class AuditEditor {
             console.log(`✏️ Légende mise à jour pour image ${imageId}:`, caption);
         }
     }
+
 
     /**
      * ✅ HEIC : Détecte et convertit les fichiers HEIC en JPEG
@@ -1403,6 +1116,7 @@ class AuditEditor {
             throw new Error(`Impossible de convertir ${file.name}: ${error.message}`);
         }
     }
+
 
     /**
      * Ouvre le lightbox pour preview avec animation fluide
@@ -1462,82 +1176,6 @@ class AuditEditor {
         preloadImg.src = base64;
     }
 
-    /**
-     * Supprime un écart (gérer aussi les images)
-     */
-    removeEcart(button) {
-        if (!confirm('⚠️ Supprimer cet écart et ses images associées ?')) return;
-
-        const ecartCard = button.closest('.ecart-card');
-        const ecartNumber = parseInt(ecartCard.dataset.ecartId);
-
-        console.log(`🗑️ Suppression écart ${ecartNumber}`);
-
-        // Supprimer les images associées
-        if (this.currentData && this.currentData.images) {
-            this.currentData.images = this.currentData.images.filter(
-                img => img.ecartNumber !== ecartNumber
-            );
-            console.log(`  ✅ Images de l'écart ${ecartNumber} supprimées`);
-        }
-
-        // Supprimer la carte
-        ecartCard.remove();
-
-        // Réindexer les écarts restants
-        this.reindexEcarts();
-    }
-
-    /**
-     * Réindexe les écarts après suppression
-     */
-    reindexEcarts() {
-        const ecartCards = this.ecartsContainer.querySelectorAll('.ecart-card');
-
-        ecartCards.forEach((card, index) => {
-            const newNumber = index + 1;
-            const oldNumber = parseInt(card.dataset.ecartId);
-
-            // Mettre à jour le data-attribute
-            card.dataset.ecartId = newNumber;
-
-            // Mettre à jour le titre
-            const title = card.querySelector('h4');
-            if (title) {
-                title.textContent = `⚠️ Écart ${newNumber}`;
-            }
-
-            // Mettre à jour les numéros d'écart dans les images
-            if (this.currentData && this.currentData.images) {
-                this.currentData.images.forEach(img => {
-                    if (img.ecartNumber === oldNumber) {
-                        img.ecartNumber = newNumber;
-                    }
-                });
-            }
-
-            // Mettre à jour les IDs et onclick
-            const imageInput = card.querySelector('.ecart-image-input');
-            if (imageInput) {
-                imageInput.id = `ecart-image-input-${newNumber}`;
-                imageInput.setAttribute('onchange', `window.editor.handleEcartImageUpload(${newNumber}, event)`);
-            }
-
-            const addBtn = card.querySelector('.btn-add-image');
-            if (addBtn) {
-                addBtn.setAttribute('onclick', `window.editor.triggerImageUpload(${newNumber})`);
-            }
-
-            const imagesGrid = card.querySelector('.ecart-images-grid');
-            if (imagesGrid) {
-                imagesGrid.id = `ecart-images-${newNumber}`;
-                this.refreshEcartImages(newNumber);
-            }
-        });
-
-        this.ecartCounter = ecartCards.length;
-        console.log(`🔄 Écarts réindexés: ${this.ecartCounter} écart(s)`);
-    }
 	
 	// =====================================================
 // COLLER DEPUIS LE PRESSE-PAPIER (Ctrl+V)
@@ -1555,6 +1193,7 @@ initClipboardPaste() {
 
     console.log('📋 Écoute Ctrl+V initialisée');
 }
+
 
 /**
  * Gère l'événement paste — détecte si on est dans une zone image
@@ -1588,7 +1227,7 @@ handlePasteEvent(event) {
 
     if (!ecartCard && !obsCard && !pfCard) {
         // Pas dans une zone image — afficher un toast d'aide
-        this.showPasteHint();
+        showToast('Cliquez dans un point fort, un écart ou une observation, puis Ctrl+V');
         return;
     }
 
@@ -1611,6 +1250,7 @@ handlePasteEvent(event) {
     }
 }
 
+
 /**
  * Traite l'image collée et l'ajoute aux données
  */
@@ -1618,7 +1258,7 @@ async processClipboardImage(file, type, number) {
     console.log(`📋 Image collée pour ${type} ${number}`);
 
     if (!this.currentData) {
-        alert('❌ Aucun rapport en cours. Créez ou chargez un rapport d\'abord.');
+        showToast("Aucun rapport en cours : créez ou chargez un rapport d'abord.", { tone: 'danger' });
         return;
     }
 
@@ -1672,52 +1312,23 @@ async processClipboardImage(file, type, number) {
 
     } catch (error) {
         console.error('❌ Erreur collage image:', error);
-        alert(`❌ Impossible de coller l'image : ${error.message}`);
+        showToast(`Impossible de coller l'image : ${error.message}`, { tone: 'danger', duration: 6000 });
     }
 }
+
 
 /**
  * Feedback visuel — flash vert sur la zone image
  */
 showPasteSuccess(type, number) {
-    let gridId;
-    if (type === 'ecart')       gridId = `ecart-images-${number}`;
-    if (type === 'observation') gridId = `observation-images-${number}`;
-    if (type === 'pointfort')   gridId = `pointfort-images-${number}`;
+    const card = this.getCard(type, number);
+    const target = card && card.querySelector('.photo-section');
+    if (!target) return;
 
-    const grid = document.getElementById(gridId);
-    if (!grid) return;
-
-    const section = grid.closest(
-        '.ecart-images-section, .observation-images-section, .ecart-images-section'
-    );
-    const target = section || grid;
-
+    // Carte repliée : on l'ouvre pour montrer la photo ajoutée
+    this.setCollapsed(card, false);
     target.classList.add('paste-success');
     setTimeout(() => target.classList.remove('paste-success'), 800);
-}
-
-/**
- * Toast d'aide si Ctrl+V est pressé hors zone image
- */
-showPasteHint() {
-    // Eviter les doublons
-    if (document.getElementById('paste-hint-toast')) return;
-
-    const toast = document.createElement('div');
-    toast.id = 'paste-hint-toast';
-    toast.className = 'paste-hint-toast';
-    toast.textContent = '💡 Cliquez dans un écart ou une observation, puis Ctrl+V';
-    document.body.appendChild(toast);
-
-    // Entrée
-    requestAnimationFrame(() => toast.classList.add('visible'));
-
-    // Sortie
-    setTimeout(() => {
-        toast.classList.remove('visible');
-        setTimeout(() => toast.remove(), 400);
-    }, 2800);
 }
 
 }
