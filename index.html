@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔄 Générateur de rapport d'audit</title>
+    <link rel="stylesheet" href="css/style.css">
+
+    <!-- Anti-FOUC : applique le thème avant le premier rendu -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('generator-theme');
+            if (saved === 'light') {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="container">
+		<div class="bg-orb bg-orb-1" aria-hidden="true"></div>
+        <div class="bg-orb bg-orb-2" aria-hidden="true"></div>
+        <div class="bg-orb bg-orb-3" aria-hidden="true"></div>
+        <header>
+            <div class="header-inner">
+                <div>
+                    <h1>Générateur de rapport <span class="accent">d'audit</span></h1>
+                    <p class="subtitle">word → json → html · édition manuelle · v1.4</p>
+                </div>
+                <div class="header-status">
+                    <div class="header-status-top">
+                        <span class="status-badge">
+                            <span class="status-dot"></span>Système actif
+                        </span>
+                        <!-- Toggle thème -->
+                        <button id="themeToggle" class="theme-toggle" aria-label="Basculer le thème">
+                            <span class="theme-toggle-icon theme-toggle-dark">🌙</span>
+                            <span class="theme-toggle-icon theme-toggle-light">☀️</span>
+                        </button>
+                    </div>
+                    <span class="version-tag">BUILD 1.4.0</span>
+                </div>
+            </div>
+
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="upload" data-index="01">
+                    <span>Import</span>
+                </button>
+                <button class="tab-btn" data-tab="edit" data-index="02">
+                    <span>Édition</span>
+                </button>
+                <button class="tab-btn" data-tab="preview" data-index="03">
+                    <span>Aperçu</span>
+                </button>
+            </div>
+        </header>
+
+        <main>
+            <!-- =====================================================
+                 ONGLET 1 : IMPORT WORD
+                 ===================================================== -->
+            <div id="tab-upload" class="tab-content active">
+                <div class="upload-section">
+                    <div class="upload-area" id="uploadArea">
+                        <div class="upload-icon">📄</div>
+                        <h2>Déposez votre fichier ici</h2>
+                        <p>ou</p>
+                        <button class="btn-upload" onclick="document.getElementById('fileInput').click()">
+                            📂 Sélectionner un fichier
+                        </button>
+                        <input type="file" id="fileInput" accept=".docx,.html,.htm,.json" style="display: none;">
+                        <p class="file-info">Formats acceptés : <strong>.docx</strong> (Word), <strong>.html</strong> (rapport existant) ou <strong>.json</strong> (données structurées)</p>
+                    </div>
+                </div>
+
+                <!-- Progress -->
+                <div id="progressSection" class="progress-section" style="display: none;">
+                    <div class="progress-bar">
+                        <div id="progressFill" class="progress-fill"></div>
+                    </div>
+                    <p id="progressText" class="progress-text">Initialisation...</p>
+                </div>
+
+                <!-- JSON Preview -->
+                <div id="jsonSection" class="result-section" style="display: none;">
+                    <h2>📋 Données extraites (JSON)</h2>
+                    <pre id="jsonPreview" class="json-preview"></pre>
+                    <div class="actions">
+                        <button id="downloadJson" class="btn btn-secondary">💾 Télécharger JSON</button>
+                        <button id="editData" class="btn btn-primary">✏️ Éditer les données</button>
+                        <button id="generateHtml" class="btn btn-primary">✨ Générer le rapport HTML</button>
+                    </div>
+                </div>
+
+                <!-- Error -->
+                <div id="errorSection" class="error-section" style="display: none;">
+                    <div class="error-box">
+                        <h3>❌ Erreur</h3>
+                        <p id="errorMessage"></p>
+                        <button id="retryBtn" class="btn btn-secondary">🔄 Réessayer</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- =====================================================
+                 ONGLET 2 : ÉDITION
+                 ===================================================== -->
+            <div id="tab-edit" class="tab-content">
+                <div class="editor-container">
+                    <div class="editor-header">
+                        <h2>✏️ Éditeur de rapport</h2>
+                        <div class="editor-actions">
+                            <button id="loadFromJson" class="btn btn-secondary">
+                                📂 Charger JSON parsé
+                            </button>
+                            <button id="loadFromJsonFile" class="btn btn-secondary">
+                                📁 Charger fichier JSON
+                            </button>
+                            <button id="createFromScratch" class="btn btn-primary">
+                                ➕ Nouveau rapport vide
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="editor-notice">
+                        <p>💡 <strong>Deux modes disponibles :</strong></p>
+                        <ul>
+                            <li><strong>Charger JSON parsé :</strong> Éditer les données extraites d'un fichier Word</li>
+                            <li><strong>Nouveau rapport :</strong> Créer un rapport from scratch</li>
+                        </ul>
+                    </div>
+
+                    <!-- FORMULAIRE D'ÉDITION -->
+                    <form id="auditForm" class="audit-form" style="display: none;">
+
+                        <!-- Métadonnées -->
+                        <section class="form-section">
+                            <h3>📋 Informations générales</h3>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="auditNumber">N° Audit</label>
+                                    <input type="text" id="auditNumber" name="auditNumber"
+                                           placeholder="Ex: 2024-001">
+                                </div>
+                                <div class="form-group">
+                                    <label for="auditTitle">Titre</label>
+                                    <input type="text" id="auditTitle" name="auditTitle"
+                                           placeholder="Ex: Audit Poste de travail">
+                                </div>
+                                <div class="form-group">
+                                    <label for="team">Équipe</label>
+                                    <input type="text" id="team" name="team"
+                                           placeholder="Ex: John DOE, Jane SMITH">
+                                </div>
+                                <div class="form-group">
+                                    <label for="period">Période</label>
+                                    <input type="text" id="period" name="period"
+                                           placeholder="Ex: S47/2024">
+                                </div>
+                                <div class="form-group">
+                                    <label for="reportDate">Date du rapport</label>
+                                    <input type="text" id="reportDate" name="reportDate"
+                                           placeholder="Ex: 25.11.2024">
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="objective">Objectif</label>
+                                <textarea id="objective" name="objective" rows="3"
+                                          placeholder="Décrivez l'objectif de l'audit..."></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="perimeter">Périmètre</label>
+                                <input type="text" id="perimeter" name="perimeter"
+                                       placeholder="Ex: Atelier Fournitures">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="referentials">Référentiels (un par ligne)</label>
+                                <textarea id="referentials" name="referentials" rows="5"
+                                          placeholder="INS-1234 Description du référentiel&#10;PRO-5678 Autre référentiel&#10;DOCUMENTATION TECHNIQUE"></textarea>
+                            </div>
+
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="contextePoste">Contexte - Poste</label>
+                                    <input type="text" id="contextePoste" name="contextePoste"
+                                           placeholder="Ex: Poste 1234">
+                                </div>
+                                <div class="form-group">
+                                    <label for="contexteArticle">Contexte - Article</label>
+                                    <input type="text" id="contexteArticle" name="contexteArticle"
+                                           placeholder="Ex: Article ABC">
+                                </div>
+                                <div class="form-group">
+                                    <label for="contexteOperation">Contexte - Opération</label>
+                                    <input type="text" id="contexteOperation" name="contexteOperation"
+                                           placeholder="Ex: OP-100">
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="auditedPersons">Personnes auditées (une par ligne)</label>
+                                <textarea id="auditedPersons" name="auditedPersons" rows="3"
+                                          placeholder="John DOE&#10;Jane SMITH"></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="distribution">Liste de diffusion (une par ligne)</label>
+                                <textarea id="distribution" name="distribution" rows="3"
+                                          placeholder="john.doe@company.com&#10;jane.smith@company.com"></textarea>
+                            </div>
+                        </section>
+
+                        <!-- Points forts -->
+                        <section class="form-section">
+                            <div class="section-header">
+                                <h3>✅ Points forts</h3>
+                                <button type="button" id="addPointFort" class="btn btn-small btn-primary">
+                                    ➕ Ajouter un point fort
+                                </button>
+                            </div>
+                            <div id="pointsforts-container" class="items-container"></div>
+                        </section>
+
+                        <!-- Écarts -->
+                        <section class="form-section">
+                            <div class="section-header">
+                                <h3>⚠️ Écarts</h3>
+                                <button type="button" id="addEcart" class="btn btn-small btn-primary">
+                                    ➕ Ajouter un écart
+                                </button>
+                            </div>
+                            <div id="ecarts-container" class="items-container"></div>
+                        </section>
+
+                        <!-- Observations -->
+                        <section class="form-section">
+                            <div class="section-header">
+                                <h3>👁️ Observations</h3>
+                                <button type="button" id="addObservation" class="btn btn-small btn-primary">
+                                    ➕ Ajouter une observation
+                                </button>
+                            </div>
+                            <div id="observations-container" class="items-container"></div>
+                        </section>
+
+                        <!-- Remarques -->
+                        <section class="form-section">
+                            <h3>💬 Remarques</h3>
+                            <div class="form-group">
+                                <label for="remarquesAudites">Remarques des audités (une par ligne)</label>
+                                <textarea id="remarquesAudites" name="remarquesAudites" rows="4"
+                                          placeholder="Remarque 1&#10;Remarque 2"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="remarquesReunion">Remarques réunion de clôture (une par ligne)</label>
+                                <textarea id="remarquesReunion" name="remarquesReunion" rows="4"
+                                          placeholder="Remarque 1&#10;Remarque 2"></textarea>
+                            </div>
+                        </section>
+
+                        <!-- Clôture -->
+                        <section class="form-section">
+                            <h3>🎯 Clôture & prochaines étapes</h3>
+
+                            <div class="form-group">
+                                <label for="prochainesEtapes">Prochaines étapes (une par ligne)</label>
+                                <textarea id="prochainesEtapes" name="prochainesEtapes" rows="6"
+                                          placeholder="Étape 1&#10;Étape 2&#10;Étape 3">Formaliser l'ensemble des écarts dans un plan d'actions avec responsables identifiés et délais de traitement.
+Prioriser la mise en conformité documentaire (plans, FIR, MOV) et la formalisation des codes outillages.
+Renforcer le pilotage de la maintenance préventive MP1 et la traçabilité des contrôles dans Flexnet.</textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="noteFinale">Note finale / Message de clôture</label>
+                                <textarea id="noteFinale" name="noteFinale" rows="4"
+                                          placeholder="Message de conclusion...">Le plan d'actions détaillé est disponible dans l'outil Monday. Une revue d'avancement permettra de suivre la fermeture des écarts, de mesurer l'impact sur la stabilité du process et de vérifier l'amélioration de la communication entre production, maintenance et industrialisation.</textarea>
+                            </div>
+                        </section>
+
+                        <!-- Actions -->
+                        <div class="form-actions">
+                            <button type="button" id="saveAndPreview" class="btn btn-primary btn-large">
+                                👁️ Enregistrer et prévisualiser
+                            </button>
+                            <button type="button" id="exportJsonBtn" class="btn btn-secondary">
+                                💾 Exporter JSON
+                            </button>
+                            <button type="button" id="resetForm" class="btn btn-secondary">
+                                🔄 Réinitialiser
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- =====================================================
+                 ONGLET 3 : APERÇU
+                 ===================================================== -->
+            <div id="tab-preview" class="tab-content">
+                <div class="preview-container">
+                    <div class="preview-header">
+                        <h2>👁️ Aperçu du rapport</h2>
+                        <div class="preview-actions">
+                            <button id="downloadHtmlFinal" class="btn btn-primary">
+                                💾 Télécharger HTML
+                            </button>
+                            <button id="backToEdit" class="btn btn-secondary">
+                                ← Retour édition
+                            </button>
+                        </div>
+                    </div>
+                    <div class="preview-iframe-container">
+                        <iframe id="previewIframe"></iframe>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>© 2026 - Convertisseur/générateur de rapport d'audit | Version 1.4</p>
+        </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+    <script src="templates/audit-template.js"></script>
+    <script src="js/parser.js"></script>
+    <script src="js/validator.js"></script>
+    <script src="js/generator.js"></script>
+    <script src="js/editor.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
