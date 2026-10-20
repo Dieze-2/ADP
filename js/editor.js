@@ -11,6 +11,8 @@ class AuditEditor {
         this.ecartCounter = 0;
         this.observationCounter = 0;
 
+        this.RECIPIENTS_STORAGE_KEY = 'generator-plan-action-recipients';
+
         this.DEFAULT_OBJECTIVE =
             "Evaluer les éventuels écarts sur le terrain avec le référentiel du secteur Fournitures et remonter les améliorations potentielles.";
 
@@ -65,7 +67,8 @@ class AuditEditor {
             situationCible: document.getElementById('situationCible'),
 
             prochainesEtapes: document.getElementById('prochainesEtapes'),
-            noteFinale: document.getElementById('noteFinale')
+            noteFinale: document.getElementById('noteFinale'),
+            planActionRecipients: document.getElementById('planActionRecipients')
         };
     }
 
@@ -228,6 +231,13 @@ class AuditEditor {
             this.formFields.noteFinale.value = (cloture.noteFinale || '');
         }
 
+        if (this.formFields.planActionRecipients) {
+            const recipients = (Array.isArray(data.planActionRecipients) && data.planActionRecipients.length > 0)
+                ? data.planActionRecipients
+                : this.getDefaultPlanActionRecipients();
+            this.formFields.planActionRecipients.value = recipients.join('\n');
+        }
+
         // Champs timeline encore présents dans le DOM → on vide pour éviter confusion
         if (this.formFields.situationActuelle) this.formFields.situationActuelle.value = '';
         if (this.formFields.situationCible) this.formFields.situationCible.value = '';
@@ -324,6 +334,26 @@ class AuditEditor {
      * Sans ça, un guillemet tronque le champ et un « </textarea> » venant
      * d'un JSON/HTML importé exécute du script (XSS).
      */
+    /**
+     * Destinataires par défaut d'un nouveau rapport : dernière saisie dans ce
+     * navigateur, sinon config.local.js. Rien n'est stocké dans le repo.
+     */
+    getDefaultPlanActionRecipients() {
+        try {
+            const saved = JSON.parse(localStorage.getItem(this.RECIPIENTS_STORAGE_KEY) || '[]');
+            if (Array.isArray(saved) && saved.length > 0) return saved;
+        } catch (e) { /* stockage indisponible : on passe à la config */ }
+
+        const cfg = window.AUDIT_CONFIG || {};
+        return Array.isArray(cfg.planActionRecipients) ? cfg.planActionRecipients : [];
+    }
+
+    rememberPlanActionRecipients(recipients) {
+        try {
+            localStorage.setItem(this.RECIPIENTS_STORAGE_KEY, JSON.stringify(recipients));
+        } catch (e) { /* non bloquant */ }
+    }
+
     escapeHtmlInput(str) {
         if (str === null || str === undefined) return '';
         return String(str)
@@ -946,6 +976,10 @@ class AuditEditor {
                 .map(d => d.trim())
                 .filter(d => d),
             images: (this.currentData && this.currentData.images) || [],
+            planActionRecipients: (this.formFields.planActionRecipients ? this.formFields.planActionRecipients.value : '')
+                .split('\n')
+                .map(r => r.trim())
+                .filter(r => r),
             cloture: {
                 noteFinale: (this.formFields.noteFinale ? this.formFields.noteFinale.value : '').trim(),
                 prochainesEtapesTexte: (this.formFields.prochainesEtapes ? this.formFields.prochainesEtapes.value : '').trim()
@@ -991,6 +1025,10 @@ class AuditEditor {
             };
             data.observations.push(obs);
         });
+
+        if (data.planActionRecipients.length > 0) {
+            this.rememberPlanActionRecipients(data.planActionRecipients);
+        }
 
         data.summary = {
             pointFortCount: data.pointsForts.length,

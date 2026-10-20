@@ -2,10 +2,14 @@
 
 Générateur de rapports d'audit HTML (Word / JSON / HTML → rapport autonome).
 
-## Configuration
+## Destinataires du plan d'action
 
-Copier `config.example.js` en `config.local.js` et y renseigner les destinataires du plan d'action.
-`config.local.js` est ignoré par git : les adresses ne sont jamais publiées.
+Saisis dans l'éditeur (section Clôture, champ « Destinataires du plan d'action »).
+Ils sont intégrés au rapport : quiconque ouvre le HTML et clique sur « Export Plan d'action » a le mail pré-rempli, sans configuration.
+La dernière saisie est mémorisée dans le navigateur du créateur pour les rapports suivants.
+
+Optionnel : valeur par défaut via `config.local.js` (copie de `config.example.js`, ignoré par git).
+Aucune adresse n'est stockée dans le repo.
 
 ## Notes en réunion
 
