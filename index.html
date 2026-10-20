@@ -325,8 +325,10 @@ Renforcer le pilotage de la maintenance préventive MP1 et la traçabilité des 
     </div>
 
     <!-- Scripts -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+    <!-- Bibliothèques en local (fonctionne hors ligne / derrière un proxy) -->
+    <!-- mammoth 1.6.0 et heic2any 0.0.4, copies du paquet npm officiel -->
+    <script src="libs/mammoth.browser.min.js"></script>
+    <script src="libs/heic2any.min.js"></script>
     <!-- Config locale non versionnée (destinataires...) : copier config.example.js en config.local.js -->
     <script src="config.local.js"></script>
     <script src="templates/audit-template.js"></script>
