@@ -5,6 +5,14 @@
 
 class AuditParser {
     constructor() {
+        this.reset();
+    }
+
+    /**
+     * Réinitialise l'état (appelé à chaque nouveau fichier : évite de
+     * partager l'objet résultat entre deux imports)
+     */
+    reset() {
         this.sections = {
             metadata: {},
             summary: {},
@@ -25,6 +33,7 @@ class AuditParser {
      */
     async parseWordFile(file) {
         try {
+            this.reset();
             const arrayBuffer = await this.readFileAsArrayBuffer(file);
             
             console.log('🔄 DÉBUT DU PARSING (avec extraction d\'images)');
@@ -101,7 +110,11 @@ class AuditParser {
         // Stratégie : Parcourir le HTML de manière séquentielle
         // et associer chaque image au dernier "Écart X" rencontré
         let currentEcartNumber = null;
+        let currentObservationNumber = null;
         let imageCounter = 0;
+        // Dédoublonnage sur la data URL complète : comparer les 100 premiers
+        // caractères confondait des photos distinctes (même en-tête EXIF/PNG)
+        const seenSources = new Set();
         
         // Parcourir tous les éléments
         const allElements = tempDiv.querySelectorAll('p, h1, h2, h3, h4, h5, h6, div');
@@ -114,8 +127,17 @@ class AuditParser {
             // Détecter un nouvel écart
             const ecartMatch = text.match(/^[ÉE]cart\s+(\d+)/i);
             if (ecartMatch) {
-                currentEcartNumber = parseInt(ecartMatch[1]);
+                currentEcartNumber = parseInt(ecartMatch[1], 10);
+                currentObservationNumber = null;
                 console.log(`    📍 Écart ${currentEcartNumber} détecté à l'élément ${index}`);
+            }
+
+            // Détecter une observation : les photos suivantes ne doivent plus
+            // être rattachées au dernier écart rencontré
+            const obsMatch = text.match(/^Observation\s+(\d+)/i);
+            if (obsMatch) {
+                currentObservationNumber = parseInt(obsMatch[1], 10);
+                currentEcartNumber = null;
             }
             
             // Chercher les images dans cet élément et ses enfants
@@ -123,13 +145,11 @@ class AuditParser {
             
             if (imgsInElement.length > 0) {
                 imgsInElement.forEach((img) => {
-                    // Vérifier que l'image n'a pas déjà été ajoutée (éviter les doublons)
-                    const imgSrc = img.src.substring(0, 100);
-                    const alreadyAdded = this.sections.images.some(
-                        existingImg => existingImg.base64.substring(0, 100) === imgSrc
-                    );
-                    
+                    // Un <img> imbriqué est vu par chaque parent (p, div...) : doublon exact
+                    const alreadyAdded = seenSources.has(img.src);
+
                     if (!alreadyAdded && img.src.startsWith('data:image')) {
+                        seenSources.add(img.src);
                         const caption = this.findImageCaption(element, allElements, index);
                         
                         const imageData = {
@@ -138,6 +158,7 @@ class AuditParser {
                             alt: img.alt || caption || `Image ${imageCounter + 1}`,
                             contentType: this.extractMimeTypeFromDataUrl(img.src),
                             ecartNumber: currentEcartNumber,
+                            observationNumber: currentObservationNumber,
                             caption: caption,
                             size: Math.round((img.src.length * 3) / 4) // Estimation de la taille
                         };
@@ -342,7 +363,9 @@ class AuditParser {
             console.log('    📄 Zone référentiels trouvée (longueur:', refZone.length, ')');
             
             // Pattern pour codes INS-XXXX, PRO-XXXX, etc.
-            const refPattern = /([A-Z]{3}-\d{4}\s+[^\n]*?)(?=\s*[A-Z]{3}-\d{4}|$)/g;
+            // Flag m : sans lui, $ = fin de texte et le dernier code avant une
+            // ligne non codifiée (ex. DOCUMENTATION TECHNIQUE) était perdu
+            const refPattern = /([A-Z]{3}-\d{4}\s+[^\n]*?)(?=\s*[A-Z]{3}-\d{4}|$)/gm;
             const matches = refZone.matchAll(refPattern);
             
             for (const match of matches) {
@@ -373,7 +396,7 @@ class AuditParser {
                 const refContent = refHeaderMatch[1];
                 console.log('    🆘 Plan B: Section RÉFÉRENTIEL trouvée');
                 
-                const refPattern = /([A-Z]{3}-\d{4}\s+[^\n]*?)(?=\s*[A-Z]{3}-\d{4}|DOCUMENTATION|CONTEXTE|$)/g;
+                const refPattern = /([A-Z]{3}-\d{4}\s+[^\n]*?)(?=\s*[A-Z]{3}-\d{4}|DOCUMENTATION|CONTEXTE|$)/gm;
                 const matches = refContent.matchAll(refPattern);
                 
                 for (const match of matches) {
@@ -434,7 +457,7 @@ class AuditParser {
             operation: ''
         };
 
-        const contextMatch = text.match(/CONTEXTE\s*:\s*([^]*?)(?=CONCLUSION|Ecarts|$)/i);
+        const contextMatch = text.match(/CONTEXTE\s*:\s*([^]*?)(?=CONCLUSION|[ÉE]carts|$)/i);
         if (contextMatch) {
             const contextSection = contextMatch[1];
             
@@ -467,7 +490,8 @@ class AuditParser {
         console.log('⚠️ EXTRACTION ÉCARTS');
         const ecarts = [];
         
-        const ecartSectionMatch = text.match(/Ecarts\s*([\s\S]*?)(?=Observations|Remarque\/s des audités|$)/i);
+        // [ÉE] : Word écrit souvent « Écart » ; /Ecart/i ne matche pas « É »
+        const ecartSectionMatch = text.match(/[ÉE]carts\s*([\s\S]*?)(?=Observations|Remarque\/s des audités|$)/i);
         
         if (!ecartSectionMatch) {
             console.log('  ❌ Section Ecarts non trouvée');
@@ -478,7 +502,7 @@ class AuditParser {
         const ecartSection = ecartSectionMatch[1];
         console.log('  ✅ Section Ecarts trouvée (longueur:', ecartSection.length, ')');
 
-        const ecartRegex = /Ecart\s+(\d+)\s+([\s\S]*?)(?=Ecart\s+\d+|$)/gi;
+        const ecartRegex = /[ÉE]cart\s+(\d+)\s+([\s\S]*?)(?=[ÉE]cart\s+\d+|$)/gi;
         let match;
 
         while ((match = ecartRegex.exec(ecartSection)) !== null) {

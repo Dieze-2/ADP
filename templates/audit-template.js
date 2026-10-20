@@ -113,7 +113,7 @@ function generateAuditReport(data) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audit ${metadata.auditNumber || ''} – ${metadata.title || ''}</title>
+    <title>Audit ${escapeHtmlText(metadata.auditNumber || '')} – ${escapeHtmlText(metadata.title || '')}</title>
     ${getStyles()}
 </head>
 <body>
@@ -2056,7 +2056,7 @@ function generateSlide1(data, total) {
     <div class="slide-header">
       <div>
         <div class="slide-kicker">Audit interne – Secteur Fournitures</div>
-        <div class="slide-title">Audit ${metadata.auditNumber || 'N/A'}<br>${metadata.title || ''}</div>
+        <div class="slide-title">Audit ${escapeHtmlText(metadata.auditNumber || 'N/A')}<br>${escapeHtmlText(metadata.title || '')}</div>
       </div>
     </div>
 
@@ -2064,17 +2064,17 @@ function generateSlide1(data, total) {
       <div class="card">
         <div class="card-title">Objectif &amp; périmètre</div>
         <p>
-          ${metadata.objective || 'Non spécifié'}
+          ${escapeHtmlText(metadata.objective || 'Non spécifié')}
         </p>
         <p style="margin-top:4px;">
-          <strong>Périmètre :</strong> ${metadata.perimeter || 'N/A'}.
+          <strong>Périmètre :</strong> ${escapeHtmlText(metadata.perimeter || 'N/A')}.
         </p>
 
         <div class="card-title" style="margin-top:10px;">Référentiels clés</div>
         <ul>
           ${
             metadata.referentials && metadata.referentials.length > 0
-              ? metadata.referentials.map(ref => `<li>${ref}</li>`).join('')
+              ? metadata.referentials.map(ref => `<li>${escapeHtmlText(ref)}</li>`).join('')
               : '<li>Aucun référentiel spécifié</li>'
           }
         </ul>
@@ -2082,17 +2082,17 @@ function generateSlide1(data, total) {
         <div class="card-title" style="margin-top:10px;">Contexte</div>
         ${
           metadata.context && metadata.context.poste
-            ? `<p>Poste : ${metadata.context.poste}</p>`
+            ? `<p>Poste : ${escapeHtmlText(metadata.context.poste)}</p>`
             : ''
         }
         ${
           metadata.context && metadata.context.article
-            ? `<p>Article : ${metadata.context.article}</p>`
+            ? `<p>Article : ${escapeHtmlText(metadata.context.article)}</p>`
             : ''
         }
         ${
           metadata.context && metadata.context.operation
-            ? `<p>Opération : ${metadata.context.operation}</p>`
+            ? `<p>Opération : ${escapeHtmlText(metadata.context.operation)}</p>`
             : ''
         }
 
@@ -2100,7 +2100,7 @@ function generateSlide1(data, total) {
         <ul>
           ${
             auditedPersons && auditedPersons.length > 0
-              ? auditedPersons.map(person => `<li>${person}</li>`).join('')
+              ? auditedPersons.map(person => `<li>${escapeHtmlText(person)}</li>`).join('')
               : '<li>Aucune personne spécifiée</li>'
           }
         </ul>
@@ -2111,23 +2111,23 @@ function generateSlide1(data, total) {
         <div class="audit-meta">
           <div class="audit-meta-item">
             <span class="audit-label">N° d'audit</span>
-            <span class="audit-value">${metadata.auditNumber || 'N/A'}</span>
+            <span class="audit-value">${escapeHtmlText(metadata.auditNumber || 'N/A')}</span>
           </div>
           <div class="audit-meta-item">
             <span class="audit-label">Équipe</span>
-            <span class="audit-value">${metadata.team || 'N/A'}</span>
+            <span class="audit-value">${escapeHtmlText(metadata.team || 'N/A')}</span>
           </div>
           <div class="audit-meta-item">
             <span class="audit-label">Période</span>
-            <span class="audit-value">${metadata.period || 'N/A'}</span>
+            <span class="audit-value">${escapeHtmlText(metadata.period || 'N/A')}</span>
           </div>
           <div class="audit-meta-item">
             <span class="audit-label">Rapport établi le</span>
-            <span class="audit-value">${metadata.reportDate || 'N/A'}</span>
+            <span class="audit-value">${escapeHtmlText(metadata.reportDate || 'N/A')}</span>
           </div>
           <div class="audit-meta-item">
             <span class="audit-label">Liste de diffusion</span>
-            <span class="audit-value">${distribution && distribution.length > 0 ? distribution.join(', ') : 'N/A'}</span>
+            <span class="audit-value">${distribution && distribution.length > 0 ? escapeHtmlText(distribution.join(', ')) : 'N/A'}</span>
           </div>
         </div>
 
@@ -2258,7 +2258,7 @@ function generatePointFortSlides(data, totalSlides, imagesPerPointFort = []) {
                         const safeAlt = escapeHtmlAttr(img.alt || '');
                         const safeCaption = escapeHtmlAttr(`Point fort ${pfNumber} - ${img.alt || ''}`);
                         return `
-                            <img src="${img.base64}"
+                            <img src="${escapeHtmlAttr(img.base64)}"
                                  alt="${safeAlt}"
                                  class="zoomable"
                                  data-caption="${safeCaption}"
@@ -2333,7 +2333,7 @@ function generateEcartSlides(data, totalSlides, imagesPerEcart = []) {
 						const safeAlt = escapeHtmlAttr(img.alt || '');
 						const safeCaption = escapeHtmlAttr(`Écart ${ecart.number} - ${img.alt || ''}`);
 						return `
-							<img src="${img.base64}" 
+							<img src="${escapeHtmlAttr(img.base64)}" 
 								 alt="${safeAlt}" 
 								 class="zoomable" 
 								 data-caption="${safeCaption}"
@@ -2393,7 +2393,7 @@ function generateObservationsSlide(data, total, imagesPerObservation) {
         const imagesHTML = obsImages.length > 0 ? `
             <div class="image-block">
                 ${obsImages.map((img, imgIndex) => `
-                    <img src="${img.base64}" 
+                    <img src="${escapeHtmlAttr(img.base64)}" 
                          alt="${escapeHtmlAttr(img.alt || img.caption || 'Image')}" 
                          class="zoomable loaded" 
                          data-caption="Observation ${obsNumber} - ${escapeHtmlAttr(img.alt || img.caption || 'Image')}"
@@ -2489,7 +2489,7 @@ function generateFinalSlide(data, total) {
         <ul>
           ${
             remarques.audites && remarques.audites.length > 0
-              ? remarques.audites.map(r => `<li>${r}</li>`).join('')
+              ? remarques.audites.map(r => `<li>${escapeHtmlText(r)}</li>`).join('')
               : '<li>Aucune remarque</li>'
           }
         </ul>
@@ -2500,13 +2500,13 @@ function generateFinalSlide(data, total) {
         <div
           class="closing-notes-content"
           id="closing-notes-content"
-          style="white-space:pre-wrap;">${noteFinale || ''}</div>
+          style="white-space:pre-wrap;">${escapeHtmlText(noteFinale)}</div>
 
         <div class="card-title" style="margin-top:15px;">Clôture &amp; prochaines étapes</div>
         <div
           class="closing-steps-content"
           id="closing-steps-content"
-          style="margin-top:8px; white-space:pre-wrap;">${prochainesEtapesDisplay || ''}</div>
+          style="margin-top:8px; white-space:pre-wrap;">${escapeHtmlText(prochainesEtapesDisplay)}</div>
       </div>
     </div>
 
@@ -2766,7 +2766,7 @@ function normalizeAuditDataForEmbed(data) {
                 typeof d.cloture?.prochainesEtapesTexte === 'string'
                     ? d.cloture.prochainesEtapesTexte
                     : Array.isArray(d.cloture?.prochainesEtapes)
-                        ? d.cloture.prochainesEtapes.join('\\n')
+                        ? d.cloture.prochainesEtapes.join('\n')
                         : ''
         }
     };
@@ -3604,13 +3604,9 @@ function getScripts() {
       return { notes: didMigrate ? migratedNotes : notesCache, migrated: didMigrate };
     }
 
+    // migrateNotesIfNeeded() n'est plus appelée : elle n'était pas idempotente
+    // (clés décalées de +pfCount à chaque ouverture du rapport).
     let notesCache = loadNotesCache();
-    const mig = migrateNotesIfNeeded(notesCache);
-    if (mig.migrated) {
-      console.log("🔁 Migration notes appliquée (ajout points forts)");
-      notesCache = mig.notes;
-      saveNotesCache(notesCache);
-    }
 
     function setHasNote(btn, has) {
       if (!btn) return;

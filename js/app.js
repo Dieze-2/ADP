@@ -114,9 +114,8 @@ class AuditConverterApp {
     async processWordFile(file) {
         this.showProgress('Lecture du fichier Word...', 20);
         this.showProgress('Extraction des données et images...', 40);
-        this.currentData = await this.parser.parseWordFile(file);
-
-        if (!Array.isArray(this.currentData.pointsForts)) this.currentData.pointsForts = [];
+        // Même normalisation que JSON/HTML : schéma unique (cloture, observations.action...)
+        this.currentData = this.normalizeJsonData(await this.parser.parseWordFile(file));
 
         this.showProgress('Validation des données...', 60);
         this.validator.validate(this.currentData);
@@ -197,30 +196,26 @@ class AuditConverterApp {
                 reportDate: data.metadata?.reportDate || '',
                 objective: data.metadata?.objective || '',
                 perimeter: data.metadata?.perimeter || '',
-                referentials: data.metadata?.referentials || [],
+                referentials: Array.isArray(data.metadata?.referentials) ? data.metadata.referentials : [],
                 context: {
                     poste: data.metadata?.context?.poste || '',
                     article: data.metadata?.context?.article || '',
                     operation: data.metadata?.context?.operation || ''
                 }
             },
-            summary: {
-                pointFortCount: data.summary?.pointFortCount || data.pointsForts?.length || 0,
-                ecartCount: data.summary?.ecartCount || data.ecarts?.length || 0,
-                observationCount: data.summary?.observationCount || data.observations?.length || 0,
-                remarqueCount: data.summary?.remarqueCount ||
-                    (data.remarques?.audites?.length || 0) + (data.remarques?.reunion?.length || 0)
-            },
+            // Compteurs recalculés en fin de fonction depuis les tableaux :
+            // un summary stocké dans le fichier peut être périmé
+            summary: {},
             pointsForts: Array.isArray(data.pointsForts) ? data.pointsForts : [],
-            ecarts: data.ecarts || [],
-            observations: data.observations || [],
+            ecarts: Array.isArray(data.ecarts) ? data.ecarts : [],
+            observations: Array.isArray(data.observations) ? data.observations : [],
             remarques: {
-                audites: data.remarques?.audites || [],
-                reunion: data.remarques?.reunion || []
+                audites: Array.isArray(data.remarques?.audites) ? data.remarques.audites : [],
+                reunion: Array.isArray(data.remarques?.reunion) ? data.remarques.reunion : []
             },
-            auditedPersons: data.auditedPersons || [],
-            distribution: data.distribution || [],
-            images: data.images || [],
+            auditedPersons: Array.isArray(data.auditedPersons) ? data.auditedPersons : [],
+            distribution: Array.isArray(data.distribution) ? data.distribution : [],
+            images: Array.isArray(data.images) ? data.images : [],
             cloture: {
                 noteFinale: data.cloture?.noteFinale || '',
                 prochainesEtapesTexte: prochainesEtapesTexte
@@ -267,6 +262,14 @@ class AuditConverterApp {
 
             return normalizedImg;
         });
+
+        // Même règle que l'éditeur (collectFormData) : remarques des audités uniquement
+        normalized.summary = {
+            pointFortCount: normalized.pointsForts.length,
+            ecartCount: normalized.ecarts.length,
+            observationCount: normalized.observations.length,
+            remarqueCount: normalized.remarques.audites.length
+        };
 
         console.log('✅ Données normalisées');
         return normalized;
