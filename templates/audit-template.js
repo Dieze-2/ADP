@@ -132,7 +132,7 @@ function generateAuditReport(data) {
     ${getMobileNav(totalSlides)}
     ${getSlideMenu(data, totalSlides)}
     ${getLightbox()}
-    ${getScripts()}
+    ${getScripts(getPlanActionRecipients())}
 </body>
 </html>`;
 }
@@ -1945,6 +1945,7 @@ function getToolbar() {
       <div class="toolbar-separator"></div>
       <div class="toolbar-row">
         <button class="toolbar-btn" id="printPDF">🖨️ PDF</button>
+        <button class="toolbar-btn" id="saveReport">💾 Enregistrer le rapport</button>
         <button class="toolbar-btn" id="exportJson">📤 Export Plan d'action</button>
       </div>
       <div class="toolbar-separator"></div>
@@ -2790,7 +2791,18 @@ function escapeHtmlJsonForScriptTag(obj) {
 // SCRIPTS JAVASCRIPT 
 // ========================================
 
-function getScripts() {
+/**
+ * Destinataires du mail « Plan d'action » : lus dans config.local.js
+ * (non versionné) pour ne pas publier d'adresses dans le repo.
+ */
+function getPlanActionRecipients() {
+    const cfg = (typeof window !== 'undefined' && window.AUDIT_CONFIG) || {};
+    return Array.isArray(cfg.planActionRecipients)
+        ? cfg.planActionRecipients.filter(r => typeof r === 'string' && r.trim())
+        : [];
+}
+
+function getScripts(recipients = []) {
   const RAW_SCRIPT = `
 /* =========================================================
  ANTI "PAGE BLANCHE" : si un script plante ou si
@@ -3563,6 +3575,82 @@ function getScripts() {
 
     const STORAGE_KEY = buildStorageKey(window.__AUDIT_DATA__.metadata.auditNumber);
 
+    // ----------------------------------------
+    // Brouillon de secours : toutes les notes saisies, sauvegardées à chaque
+    // « Enregistrer » d'une note. Restauré à l'ouverture si le fichier n'a pas
+    // été ré-enregistré depuis (fermeture accidentelle, crash...).
+    // L'empreinte évite d'appliquer un brouillon à un rapport régénéré
+    // dont les écarts/observations ont changé.
+    // ----------------------------------------
+    const DRAFT_KEY = "audit-draft::" + STORAGE_KEY;
+
+    function hashString(str) {
+      let h = 5381;
+      for (let i = 0; i < str.length; i++) h = ((h * 33) ^ str.charCodeAt(i)) >>> 0;
+      return h.toString(36);
+    }
+
+    function getStructureFingerprint(d) {
+      return hashString(JSON.stringify([
+        d.ecarts.map(e => [e.exigence, e.constat]),
+        d.observations.map(o => [o.constat, o.risque])
+      ]));
+    }
+
+    function extractNotes(d) {
+      const pick = (x) => ({ action: x.action || "", responsable: x.responsable || "", delai: x.delai || "" });
+      return {
+        ecarts: d.ecarts.map(pick),
+        observations: d.observations.map(pick),
+        cloture: {
+          noteFinale: d.cloture.noteFinale || "",
+          prochainesEtapesTexte: d.cloture.prochainesEtapesTexte || ""
+        }
+      };
+    }
+
+    function applyNotes(d, notes) {
+      (notes.ecarts || []).forEach((n, i) => { if (d.ecarts[i]) Object.assign(d.ecarts[i], n); });
+      (notes.observations || []).forEach((n, i) => { if (d.observations[i]) Object.assign(d.observations[i], n); });
+      if (notes.cloture) Object.assign(d.cloture, notes.cloture);
+    }
+
+    function saveDraft() {
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({
+          savedAt: new Date().toISOString(),
+          fingerprint: getStructureFingerprint(window.__AUDIT_DATA__),
+          notes: extractNotes(window.__AUDIT_DATA__)
+        }));
+      } catch (e) {
+        console.error("Erreur sauvegarde brouillon:", e);
+      }
+      window.__AUDIT_DIRTY__ = true;
+    }
+
+    window.__AUDIT_CLEAR_DRAFT__ = function () {
+      try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+      window.__AUDIT_DIRTY__ = false;
+    };
+
+    (function restoreDraftIfAny() {
+      let draft = null;
+      try { draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null"); } catch (e) {}
+      if (!draft || !draft.notes) return;
+
+      const current = window.__AUDIT_DATA__;
+      if (draft.fingerprint !== getStructureFingerprint(current)) return;
+      if (JSON.stringify(draft.notes) === JSON.stringify(extractNotes(current))) return;
+
+      const when = draft.savedAt ? new Date(draft.savedAt).toLocaleString("fr-FR") : "?";
+      if (confirm("Des notes saisies le " + when + " n'ont pas été enregistrées dans ce fichier.\\n\\nLes restaurer ?")) {
+        applyNotes(current, draft.notes);
+        window.__AUDIT_DIRTY__ = true;
+      } else {
+        window.__AUDIT_CLEAR_DRAFT__();
+      }
+    })();
+
     function loadNotesCache() {
       const saved = localStorage.getItem(STORAGE_KEY);
       try {
@@ -3736,6 +3824,7 @@ function getScripts() {
           else delete notesCache[slideNum];
 
           saveNotesCache(notesCache);
+          saveDraft();
           setHasNote(btn, has);
           noteContent.classList.remove("visible");
           updateMobileNoteButtonFromCache();
@@ -3768,6 +3857,7 @@ function getScripts() {
         else delete notesCache[slideNum];
 
         saveNotesCache(notesCache);
+        saveDraft();
         setHasNote(btn, has);
         noteContent.classList.remove("visible");
         updateMobileNoteButtonFromCache();
@@ -3824,10 +3914,7 @@ function getScripts() {
           a.click();
           URL.revokeObjectURL(url);
 
-          const to = [
-            "destinataire1@exemple.com",
-            "destinataire2@exemple.com"
-          ].join(";");
+          const to = PLAN_ACTION_RECIPIENTS.join(";");
 
           const subject = "Plan d'action de l'audit " + auditNumber;
           const body = "Veuillez joindre le fichier .json téléchargé avec votre e-mail";
@@ -3850,6 +3937,100 @@ function getScripts() {
   })();
 
   // ========================================
+  // ENREGISTRER LE RAPPORT (HTML autonome avec les notes intégrées)
+  // Remplace le cycle export JSON -> générateur -> nouveau HTML.
+  // ========================================
+  (function() {
+    "use strict";
+    const saveBtn = document.getElementById("saveReport");
+    if (!saveBtn) return;
+
+    let fileHandle = null; // réutilisé : les enregistrements suivants écrasent le même fichier
+
+    function buildReportHtml() {
+      const doc = new DOMParser().parseFromString(__PRISTINE_HTML__, "text/html");
+      const dataEl = doc.getElementById("embedded-audit-data");
+      if (!dataEl) throw new Error("Bloc embedded-audit-data introuvable");
+      // "<" échappé : le contenu d'un <script> est sérialisé tel quel
+      dataEl.textContent = JSON.stringify(window.__AUDIT_DATA__)
+        .split("<").join(String.fromCharCode(92) + "u003c");
+      return "<!DOCTYPE html>\\n" + doc.documentElement.outerHTML;
+    }
+
+    function getFileName() {
+      const n = (window.__AUDIT_DATA__.metadata && window.__AUDIT_DATA__.metadata.auditNumber) || "sans-numero";
+      return "Rapport d'audit " + String(n).trim() + ".html";
+    }
+
+    function downloadFallback(html) {
+      const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = getFileName();
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    }
+
+    async function saveReport() {
+      const html = buildReportHtml();
+
+      // Chrome/Edge : choix de l'emplacement une fois, puis écrasement direct
+      if (window.showSaveFilePicker) {
+        try {
+          if (!fileHandle) {
+            fileHandle = await window.showSaveFilePicker({
+              suggestedName: getFileName(),
+              types: [{ description: "Rapport HTML", accept: { "text/html": [".html"] } }]
+            });
+          }
+          const writable = await fileHandle.createWritable();
+          await writable.write(html);
+          await writable.close();
+        } catch (e) {
+          if (e && e.name === "AbortError") return; // annulé par l'utilisateur
+          console.warn("Enregistrement direct impossible, téléchargement:", e);
+          fileHandle = null;
+          downloadFallback(html);
+        }
+      } else {
+        downloadFallback(html); // Firefox/Safari : fichier dans Téléchargements
+      }
+
+      window.__AUDIT_CLEAR_DRAFT__();
+      const label = saveBtn.textContent;
+      saveBtn.textContent = "✅ Enregistré";
+      setTimeout(() => { saveBtn.textContent = label; }, 1500);
+    }
+
+    saveBtn.addEventListener("click", () => {
+      saveReport().catch((e) => {
+        console.error("❌ Enregistrement impossible:", e);
+        alert("❌ Enregistrement impossible : " + e.message);
+      });
+    });
+
+    // Raccourci Ctrl+S / Cmd+S
+    document.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        saveBtn.click();
+      }
+    });
+
+    // Alerte à la fermeture s'il reste des notes non enregistrées dans le fichier
+    // (uniquement en autonome : pas dans l'aperçu du générateur)
+    if (window.top === window) {
+      window.addEventListener("beforeunload", (e) => {
+        if (!window.__AUDIT_DIRTY__) return;
+        e.preventDefault();
+        e.returnValue = "";
+      });
+    }
+  })();
+
+  // ========================================
   // EXPORT PDF
   // ========================================
   (function() {
@@ -3862,7 +4043,14 @@ function getScripts() {
   })();
 `;
 
-  const safeJs = RAW_SCRIPT
+  // Préambule injecté hors template literal :
+  // - __PRISTINE_HTML__ : DOM d'origine, avant toute modif du runtime, base de « Enregistrer le rapport »
+  // - PLAN_ACTION_RECIPIENTS : destinataires issus de config.local.js
+  const PREAMBLE =
+    'var __PRISTINE_HTML__ = "<!DOCTYPE html>\\n" + document.documentElement.outerHTML;\n' +
+    'var PLAN_ACTION_RECIPIENTS = ' + JSON.stringify(recipients).split('<').join('\\u003c') + ';\n';
+
+  const safeJs = (PREAMBLE + RAW_SCRIPT)
     .replace(/\u2028/g, "\\u2028")
     .replace(/\u2029/g, "\\u2029")
     .replace(/\uFEFF/g, "")
