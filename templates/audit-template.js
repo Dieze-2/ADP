@@ -113,7 +113,7 @@ function generateAuditReport(data) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audit ${metadata.auditNumber || ''} – ${metadata.title || ''}</title>
+    <title>Audit ${escapeHtmlText(metadata.auditNumber || '')} – ${escapeHtmlText(metadata.title || '')}</title>
     ${getStyles()}
 </head>
 <body>
@@ -132,7 +132,7 @@ function generateAuditReport(data) {
     ${getMobileNav(totalSlides)}
     ${getSlideMenu(data, totalSlides)}
     ${getLightbox()}
-    ${getScripts()}
+    ${getScripts(getPlanActionRecipients())}
 </body>
 </html>`;
 }
@@ -1945,6 +1945,7 @@ function getToolbar() {
       <div class="toolbar-separator"></div>
       <div class="toolbar-row">
         <button class="toolbar-btn" id="printPDF">🖨️ PDF</button>
+        <button class="toolbar-btn" id="saveReport">💾 Enregistrer le rapport</button>
         <button class="toolbar-btn" id="exportJson">📤 Export Plan d'action</button>
       </div>
       <div class="toolbar-separator"></div>
@@ -2056,7 +2057,7 @@ function generateSlide1(data, total) {
     <div class="slide-header">
       <div>
         <div class="slide-kicker">Audit interne – Secteur Fournitures</div>
-        <div class="slide-title">Audit ${metadata.auditNumber || 'N/A'}<br>${metadata.title || ''}</div>
+        <div class="slide-title">Audit ${escapeHtmlText(metadata.auditNumber || 'N/A')}<br>${escapeHtmlText(metadata.title || '')}</div>
       </div>
     </div>
 
@@ -2064,17 +2065,17 @@ function generateSlide1(data, total) {
       <div class="card">
         <div class="card-title">Objectif &amp; périmètre</div>
         <p>
-          ${metadata.objective || 'Non spécifié'}
+          ${escapeHtmlText(metadata.objective || 'Non spécifié')}
         </p>
         <p style="margin-top:4px;">
-          <strong>Périmètre :</strong> ${metadata.perimeter || 'N/A'}.
+          <strong>Périmètre :</strong> ${escapeHtmlText(metadata.perimeter || 'N/A')}.
         </p>
 
         <div class="card-title" style="margin-top:10px;">Référentiels clés</div>
         <ul>
           ${
             metadata.referentials && metadata.referentials.length > 0
-              ? metadata.referentials.map(ref => `<li>${ref}</li>`).join('')
+              ? metadata.referentials.map(ref => `<li>${escapeHtmlText(ref)}</li>`).join('')
               : '<li>Aucun référentiel spécifié</li>'
           }
         </ul>
@@ -2082,17 +2083,17 @@ function generateSlide1(data, total) {
         <div class="card-title" style="margin-top:10px;">Contexte</div>
         ${
           metadata.context && metadata.context.poste
-            ? `<p>Poste : ${metadata.context.poste}</p>`
+            ? `<p>Poste : ${escapeHtmlText(metadata.context.poste)}</p>`
             : ''
         }
         ${
           metadata.context && metadata.context.article
-            ? `<p>Article : ${metadata.context.article}</p>`
+            ? `<p>Article : ${escapeHtmlText(metadata.context.article)}</p>`
             : ''
         }
         ${
           metadata.context && metadata.context.operation
-            ? `<p>Opération : ${metadata.context.operation}</p>`
+            ? `<p>Opération : ${escapeHtmlText(metadata.context.operation)}</p>`
             : ''
         }
 
@@ -2100,7 +2101,7 @@ function generateSlide1(data, total) {
         <ul>
           ${
             auditedPersons && auditedPersons.length > 0
-              ? auditedPersons.map(person => `<li>${person}</li>`).join('')
+              ? auditedPersons.map(person => `<li>${escapeHtmlText(person)}</li>`).join('')
               : '<li>Aucune personne spécifiée</li>'
           }
         </ul>
@@ -2111,23 +2112,23 @@ function generateSlide1(data, total) {
         <div class="audit-meta">
           <div class="audit-meta-item">
             <span class="audit-label">N° d'audit</span>
-            <span class="audit-value">${metadata.auditNumber || 'N/A'}</span>
+            <span class="audit-value">${escapeHtmlText(metadata.auditNumber || 'N/A')}</span>
           </div>
           <div class="audit-meta-item">
             <span class="audit-label">Équipe</span>
-            <span class="audit-value">${metadata.team || 'N/A'}</span>
+            <span class="audit-value">${escapeHtmlText(metadata.team || 'N/A')}</span>
           </div>
           <div class="audit-meta-item">
             <span class="audit-label">Période</span>
-            <span class="audit-value">${metadata.period || 'N/A'}</span>
+            <span class="audit-value">${escapeHtmlText(metadata.period || 'N/A')}</span>
           </div>
           <div class="audit-meta-item">
             <span class="audit-label">Rapport établi le</span>
-            <span class="audit-value">${metadata.reportDate || 'N/A'}</span>
+            <span class="audit-value">${escapeHtmlText(metadata.reportDate || 'N/A')}</span>
           </div>
           <div class="audit-meta-item">
             <span class="audit-label">Liste de diffusion</span>
-            <span class="audit-value">${distribution && distribution.length > 0 ? distribution.join(', ') : 'N/A'}</span>
+            <span class="audit-value">${distribution && distribution.length > 0 ? escapeHtmlText(distribution.join(', ')) : 'N/A'}</span>
           </div>
         </div>
 
@@ -2258,7 +2259,7 @@ function generatePointFortSlides(data, totalSlides, imagesPerPointFort = []) {
                         const safeAlt = escapeHtmlAttr(img.alt || '');
                         const safeCaption = escapeHtmlAttr(`Point fort ${pfNumber} - ${img.alt || ''}`);
                         return `
-                            <img src="${img.base64}"
+                            <img src="${escapeHtmlAttr(img.base64)}"
                                  alt="${safeAlt}"
                                  class="zoomable"
                                  data-caption="${safeCaption}"
@@ -2333,7 +2334,7 @@ function generateEcartSlides(data, totalSlides, imagesPerEcart = []) {
 						const safeAlt = escapeHtmlAttr(img.alt || '');
 						const safeCaption = escapeHtmlAttr(`Écart ${ecart.number} - ${img.alt || ''}`);
 						return `
-							<img src="${img.base64}" 
+							<img src="${escapeHtmlAttr(img.base64)}" 
 								 alt="${safeAlt}" 
 								 class="zoomable" 
 								 data-caption="${safeCaption}"
@@ -2393,7 +2394,7 @@ function generateObservationsSlide(data, total, imagesPerObservation) {
         const imagesHTML = obsImages.length > 0 ? `
             <div class="image-block">
                 ${obsImages.map((img, imgIndex) => `
-                    <img src="${img.base64}" 
+                    <img src="${escapeHtmlAttr(img.base64)}" 
                          alt="${escapeHtmlAttr(img.alt || img.caption || 'Image')}" 
                          class="zoomable loaded" 
                          data-caption="Observation ${obsNumber} - ${escapeHtmlAttr(img.alt || img.caption || 'Image')}"
@@ -2489,7 +2490,7 @@ function generateFinalSlide(data, total) {
         <ul>
           ${
             remarques.audites && remarques.audites.length > 0
-              ? remarques.audites.map(r => `<li>${r}</li>`).join('')
+              ? remarques.audites.map(r => `<li>${escapeHtmlText(r)}</li>`).join('')
               : '<li>Aucune remarque</li>'
           }
         </ul>
@@ -2500,13 +2501,13 @@ function generateFinalSlide(data, total) {
         <div
           class="closing-notes-content"
           id="closing-notes-content"
-          style="white-space:pre-wrap;">${noteFinale || ''}</div>
+          style="white-space:pre-wrap;">${escapeHtmlText(noteFinale)}</div>
 
         <div class="card-title" style="margin-top:15px;">Clôture &amp; prochaines étapes</div>
         <div
           class="closing-steps-content"
           id="closing-steps-content"
-          style="margin-top:8px; white-space:pre-wrap;">${prochainesEtapesDisplay || ''}</div>
+          style="margin-top:8px; white-space:pre-wrap;">${escapeHtmlText(prochainesEtapesDisplay)}</div>
       </div>
     </div>
 
@@ -2766,7 +2767,7 @@ function normalizeAuditDataForEmbed(data) {
                 typeof d.cloture?.prochainesEtapesTexte === 'string'
                     ? d.cloture.prochainesEtapesTexte
                     : Array.isArray(d.cloture?.prochainesEtapes)
-                        ? d.cloture.prochainesEtapes.join('\\n')
+                        ? d.cloture.prochainesEtapes.join('\n')
                         : ''
         }
     };
@@ -2790,7 +2791,18 @@ function escapeHtmlJsonForScriptTag(obj) {
 // SCRIPTS JAVASCRIPT 
 // ========================================
 
-function getScripts() {
+/**
+ * Destinataires du mail « Plan d'action » : lus dans config.local.js
+ * (non versionné) pour ne pas publier d'adresses dans le repo.
+ */
+function getPlanActionRecipients() {
+    const cfg = (typeof window !== 'undefined' && window.AUDIT_CONFIG) || {};
+    return Array.isArray(cfg.planActionRecipients)
+        ? cfg.planActionRecipients.filter(r => typeof r === 'string' && r.trim())
+        : [];
+}
+
+function getScripts(recipients = []) {
   const RAW_SCRIPT = `
 /* =========================================================
  ANTI "PAGE BLANCHE" : si un script plante ou si
@@ -3563,6 +3575,82 @@ function getScripts() {
 
     const STORAGE_KEY = buildStorageKey(window.__AUDIT_DATA__.metadata.auditNumber);
 
+    // ----------------------------------------
+    // Brouillon de secours : toutes les notes saisies, sauvegardées à chaque
+    // « Enregistrer » d'une note. Restauré à l'ouverture si le fichier n'a pas
+    // été ré-enregistré depuis (fermeture accidentelle, crash...).
+    // L'empreinte évite d'appliquer un brouillon à un rapport régénéré
+    // dont les écarts/observations ont changé.
+    // ----------------------------------------
+    const DRAFT_KEY = "audit-draft::" + STORAGE_KEY;
+
+    function hashString(str) {
+      let h = 5381;
+      for (let i = 0; i < str.length; i++) h = ((h * 33) ^ str.charCodeAt(i)) >>> 0;
+      return h.toString(36);
+    }
+
+    function getStructureFingerprint(d) {
+      return hashString(JSON.stringify([
+        d.ecarts.map(e => [e.exigence, e.constat]),
+        d.observations.map(o => [o.constat, o.risque])
+      ]));
+    }
+
+    function extractNotes(d) {
+      const pick = (x) => ({ action: x.action || "", responsable: x.responsable || "", delai: x.delai || "" });
+      return {
+        ecarts: d.ecarts.map(pick),
+        observations: d.observations.map(pick),
+        cloture: {
+          noteFinale: d.cloture.noteFinale || "",
+          prochainesEtapesTexte: d.cloture.prochainesEtapesTexte || ""
+        }
+      };
+    }
+
+    function applyNotes(d, notes) {
+      (notes.ecarts || []).forEach((n, i) => { if (d.ecarts[i]) Object.assign(d.ecarts[i], n); });
+      (notes.observations || []).forEach((n, i) => { if (d.observations[i]) Object.assign(d.observations[i], n); });
+      if (notes.cloture) Object.assign(d.cloture, notes.cloture);
+    }
+
+    function saveDraft() {
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({
+          savedAt: new Date().toISOString(),
+          fingerprint: getStructureFingerprint(window.__AUDIT_DATA__),
+          notes: extractNotes(window.__AUDIT_DATA__)
+        }));
+      } catch (e) {
+        console.error("Erreur sauvegarde brouillon:", e);
+      }
+      window.__AUDIT_DIRTY__ = true;
+    }
+
+    window.__AUDIT_CLEAR_DRAFT__ = function () {
+      try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+      window.__AUDIT_DIRTY__ = false;
+    };
+
+    (function restoreDraftIfAny() {
+      let draft = null;
+      try { draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null"); } catch (e) {}
+      if (!draft || !draft.notes) return;
+
+      const current = window.__AUDIT_DATA__;
+      if (draft.fingerprint !== getStructureFingerprint(current)) return;
+      if (JSON.stringify(draft.notes) === JSON.stringify(extractNotes(current))) return;
+
+      const when = draft.savedAt ? new Date(draft.savedAt).toLocaleString("fr-FR") : "?";
+      if (confirm("Des notes saisies le " + when + " n'ont pas été enregistrées dans ce fichier.\\n\\nLes restaurer ?")) {
+        applyNotes(current, draft.notes);
+        window.__AUDIT_DIRTY__ = true;
+      } else {
+        window.__AUDIT_CLEAR_DRAFT__();
+      }
+    })();
+
     function loadNotesCache() {
       const saved = localStorage.getItem(STORAGE_KEY);
       try {
@@ -3604,13 +3692,9 @@ function getScripts() {
       return { notes: didMigrate ? migratedNotes : notesCache, migrated: didMigrate };
     }
 
+    // migrateNotesIfNeeded() n'est plus appelée : elle n'était pas idempotente
+    // (clés décalées de +pfCount à chaque ouverture du rapport).
     let notesCache = loadNotesCache();
-    const mig = migrateNotesIfNeeded(notesCache);
-    if (mig.migrated) {
-      console.log("🔁 Migration notes appliquée (ajout points forts)");
-      notesCache = mig.notes;
-      saveNotesCache(notesCache);
-    }
 
     function setHasNote(btn, has) {
       if (!btn) return;
@@ -3740,6 +3824,7 @@ function getScripts() {
           else delete notesCache[slideNum];
 
           saveNotesCache(notesCache);
+          saveDraft();
           setHasNote(btn, has);
           noteContent.classList.remove("visible");
           updateMobileNoteButtonFromCache();
@@ -3772,6 +3857,7 @@ function getScripts() {
         else delete notesCache[slideNum];
 
         saveNotesCache(notesCache);
+        saveDraft();
         setHasNote(btn, has);
         noteContent.classList.remove("visible");
         updateMobileNoteButtonFromCache();
@@ -3828,10 +3914,7 @@ function getScripts() {
           a.click();
           URL.revokeObjectURL(url);
 
-          const to = [
-            "destinataire1@exemple.com",
-            "destinataire2@exemple.com"
-          ].join(";");
+          const to = PLAN_ACTION_RECIPIENTS.join(";");
 
           const subject = "Plan d'action de l'audit " + auditNumber;
           const body = "Veuillez joindre le fichier .json téléchargé avec votre e-mail";
@@ -3854,6 +3937,100 @@ function getScripts() {
   })();
 
   // ========================================
+  // ENREGISTRER LE RAPPORT (HTML autonome avec les notes intégrées)
+  // Remplace le cycle export JSON -> générateur -> nouveau HTML.
+  // ========================================
+  (function() {
+    "use strict";
+    const saveBtn = document.getElementById("saveReport");
+    if (!saveBtn) return;
+
+    let fileHandle = null; // réutilisé : les enregistrements suivants écrasent le même fichier
+
+    function buildReportHtml() {
+      const doc = new DOMParser().parseFromString(__PRISTINE_HTML__, "text/html");
+      const dataEl = doc.getElementById("embedded-audit-data");
+      if (!dataEl) throw new Error("Bloc embedded-audit-data introuvable");
+      // "<" échappé : le contenu d'un <script> est sérialisé tel quel
+      dataEl.textContent = JSON.stringify(window.__AUDIT_DATA__)
+        .split("<").join(String.fromCharCode(92) + "u003c");
+      return "<!DOCTYPE html>\\n" + doc.documentElement.outerHTML;
+    }
+
+    function getFileName() {
+      const n = (window.__AUDIT_DATA__.metadata && window.__AUDIT_DATA__.metadata.auditNumber) || "sans-numero";
+      return "Rapport d'audit " + String(n).trim() + ".html";
+    }
+
+    function downloadFallback(html) {
+      const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = getFileName();
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    }
+
+    async function saveReport() {
+      const html = buildReportHtml();
+
+      // Chrome/Edge : choix de l'emplacement une fois, puis écrasement direct
+      if (window.showSaveFilePicker) {
+        try {
+          if (!fileHandle) {
+            fileHandle = await window.showSaveFilePicker({
+              suggestedName: getFileName(),
+              types: [{ description: "Rapport HTML", accept: { "text/html": [".html"] } }]
+            });
+          }
+          const writable = await fileHandle.createWritable();
+          await writable.write(html);
+          await writable.close();
+        } catch (e) {
+          if (e && e.name === "AbortError") return; // annulé par l'utilisateur
+          console.warn("Enregistrement direct impossible, téléchargement:", e);
+          fileHandle = null;
+          downloadFallback(html);
+        }
+      } else {
+        downloadFallback(html); // Firefox/Safari : fichier dans Téléchargements
+      }
+
+      window.__AUDIT_CLEAR_DRAFT__();
+      const label = saveBtn.textContent;
+      saveBtn.textContent = "✅ Enregistré";
+      setTimeout(() => { saveBtn.textContent = label; }, 1500);
+    }
+
+    saveBtn.addEventListener("click", () => {
+      saveReport().catch((e) => {
+        console.error("❌ Enregistrement impossible:", e);
+        alert("❌ Enregistrement impossible : " + e.message);
+      });
+    });
+
+    // Raccourci Ctrl+S / Cmd+S
+    document.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        saveBtn.click();
+      }
+    });
+
+    // Alerte à la fermeture s'il reste des notes non enregistrées dans le fichier
+    // (uniquement en autonome : pas dans l'aperçu du générateur)
+    if (window.top === window) {
+      window.addEventListener("beforeunload", (e) => {
+        if (!window.__AUDIT_DIRTY__) return;
+        e.preventDefault();
+        e.returnValue = "";
+      });
+    }
+  })();
+
+  // ========================================
   // EXPORT PDF
   // ========================================
   (function() {
@@ -3866,7 +4043,14 @@ function getScripts() {
   })();
 `;
 
-  const safeJs = RAW_SCRIPT
+  // Préambule injecté hors template literal :
+  // - __PRISTINE_HTML__ : DOM d'origine, avant toute modif du runtime, base de « Enregistrer le rapport »
+  // - PLAN_ACTION_RECIPIENTS : destinataires issus de config.local.js
+  const PREAMBLE =
+    'var __PRISTINE_HTML__ = "<!DOCTYPE html>\\n" + document.documentElement.outerHTML;\n' +
+    'var PLAN_ACTION_RECIPIENTS = ' + JSON.stringify(recipients).split('<').join('\\u003c') + ';\n';
+
+  const safeJs = (PREAMBLE + RAW_SCRIPT)
     .replace(/\u2028/g, "\\u2028")
     .replace(/\u2029/g, "\\u2029")
     .replace(/\uFEFF/g, "")

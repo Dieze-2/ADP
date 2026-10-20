@@ -184,6 +184,8 @@ class AuditEditor {
 
         // ✅ compat
         if (!Array.isArray(data.pointsForts)) data.pointsForts = [];
+        if (!Array.isArray(data.images)) data.images = [];
+        this.ensureImageIds(data.images);
 
         this.formFields.auditNumber.value = data.metadata.auditNumber || '';
         this.formFields.auditTitle.value = data.metadata.title || '';
@@ -317,14 +319,23 @@ class AuditEditor {
         console.log(`➕ Point fort ${pointFortNumber} ajouté avec ${pfImages.length} image(s)`);
     }
 
+    /**
+     * Échappe une valeur injectée via innerHTML (attribut ou contenu).
+     * Sans ça, un guillemet tronque le champ et un « </textarea> » venant
+     * d'un JSON/HTML importé exécute du script (XSS).
+     */
     escapeHtmlInput(str) {
         if (str === null || str === undefined) return '';
-        return String(str).replace(/"/g, '&quot;');
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
     }
 
     escapeHtmlTextarea(str) {
-        if (str === null || str === undefined) return '';
-        return String(str);
+        return this.escapeHtmlInput(str);
     }
 
     getImagesForPointFort(pointFortNumber) {
@@ -336,27 +347,26 @@ class AuditEditor {
         if (!images || images.length === 0) return '';
 
         return images.map((img) => {
-            const globalIndex = this.getGlobalImageIndex(img);
             const sizeKB = img.size
                 ? (img.size / 1024).toFixed(1)
                 : ((img.base64.length * 3 / 4) / 1024).toFixed(1);
 
             return `
-                <div class="ecart-image-item">
-                    <img src="${img.base64}"
-                         alt="${img.alt || 'Image'}"
+                <div class="ecart-image-item" data-image-id="${this.escapeHtmlInput(img.id)}">
+                    <img src="${this.escapeHtmlInput(img.base64)}"
+                         alt="${this.escapeHtmlInput(img.alt || 'Image')}"
                          class="ecart-image-preview"
-                         onclick="window.editor.openImageLightbox('${img.base64.replace(/'/g, "\\'")}')">
+                         onclick="window.editor.openImageLightbox(this.src)">
 
                     <input type="text"
                            class="ecart-image-caption"
                            placeholder="Légende..."
-                           value="${img.alt || img.caption || ''}"
-                           onchange="window.editor.updateImageCaption(${globalIndex}, this.value)">
+                           value="${this.escapeHtmlInput(img.alt || img.caption || '')}"
+                           onchange="window.editor.updateImageCaption(this.closest('[data-image-id]').dataset.imageId, this.value)">
 
                     <button type="button"
                             class="ecart-image-delete"
-                            onclick="window.editor.removePointFortImage(${pointFortNumber}, ${globalIndex})">
+                            onclick="window.editor.removePointFortImage(${pointFortNumber}, this.closest('[data-image-id]').dataset.imageId)">
                         🗑️ Supprimer
                     </button>
 
@@ -416,13 +426,12 @@ class AuditEditor {
         console.log(`🔄 Images du point fort ${pointFortNumber} rafraîchies: ${images.length} image(s)`);
     }
 
-    removePointFortImage(pointFortNumber, globalIndex) {
+    removePointFortImage(pointFortNumber, imageId) {
         if (!confirm('⚠️ Supprimer cette image ?')) return;
 
-        console.log(`🗑️ Suppression image index ${globalIndex} du point fort ${pointFortNumber}`);
-
-        if (this.currentData.images && globalIndex >= 0 && globalIndex < this.currentData.images.length) {
-            this.currentData.images.splice(globalIndex, 1);
+        const index = this.findImageIndexById(imageId);
+        if (index !== -1) {
+            this.currentData.images.splice(index, 1);
             this.refreshPointFortImages(pointFortNumber);
         }
     }
@@ -522,7 +531,7 @@ class AuditEditor {
                 <label>Exigence</label>
                 <input type="text" 
                        class="ecart-exigence" 
-                       value="${exigenceVal}"
+                       value="${this.escapeHtmlInput(exigenceVal)}"
                        placeholder="Ex: INS-2426 / Bonnes pratiques de fabrication">
             </div>
             
@@ -530,7 +539,7 @@ class AuditEditor {
                 <label>Constat</label>
                 <textarea class="ecart-constat" 
                           rows="4" 
-                          placeholder="Décrivez le constat observé...">${constatVal}</textarea>
+                          placeholder="Décrivez le constat observé...">${this.escapeHtmlTextarea(constatVal)}</textarea>
             </div>
             
             <!-- ✅ SECTION IMAGES POUR CET ÉCART -->
@@ -558,7 +567,7 @@ class AuditEditor {
                 <label>Action corrective</label>
                 <input type="text" 
                        class="ecart-action" 
-                       value="${actionVal}"
+                       value="${this.escapeHtmlInput(actionVal)}"
                        placeholder="Action à mettre en place">
             </div>
             
@@ -567,14 +576,14 @@ class AuditEditor {
                     <label>Responsable</label>
                     <input type="text" 
                            class="ecart-responsable" 
-                           value="${responsableVal}"
+                           value="${this.escapeHtmlInput(responsableVal)}"
                            placeholder="Nom du responsable">
                 </div>
                 <div class="form-group">
                     <label>Délai</label>
                     <input type="text" 
                            class="ecart-delai" 
-                           value="${delaiVal}"
+                           value="${this.escapeHtmlInput(delaiVal)}"
                            placeholder="Ex: 31/12/2024">
                 </div>
             </div>
@@ -617,7 +626,7 @@ class AuditEditor {
 				<textarea class="observation-constat"
 						  rows="4"
 						  placeholder="Décrivez l'observation..."
-						  required>${constatVal}</textarea>
+						  required>${this.escapeHtmlTextarea(constatVal)}</textarea>
 			</div>
 
 			<div class="observation-images-section">
@@ -644,14 +653,14 @@ class AuditEditor {
 				<label>Risque associé</label>
 				<textarea class="observation-risque"
 						  rows="3"
-						  placeholder="Décrivez le risque potentiel...">${risqueVal}</textarea>
+						  placeholder="Décrivez le risque potentiel...">${this.escapeHtmlTextarea(risqueVal)}</textarea>
 			</div>
 
 			<div class="form-group">
 				<label>Action</label>
 				<input type="text"
 					   class="observation-action"
-					   value="${actionVal}"
+					   value="${this.escapeHtmlInput(actionVal)}"
 					   placeholder="Action à mettre en place">
 			</div>
 
@@ -660,14 +669,14 @@ class AuditEditor {
 					<label>Responsable</label>
 					<input type="text"
 						   class="observation-responsable"
-						   value="${responsableVal}"
+						   value="${this.escapeHtmlInput(responsableVal)}"
 						   placeholder="Nom du responsable">
 				</div>
 				<div class="form-group">
 					<label>Délai</label>
 					<input type="text"
 						   class="observation-delai"
-						   value="${delaiVal}"
+						   value="${this.escapeHtmlInput(delaiVal)}"
 						   placeholder="Ex: 31/12/2024">
 				</div>
 			</div>
@@ -694,27 +703,26 @@ class AuditEditor {
         if (!images || images.length === 0) return '';
 
         return images.map((img) => {
-            const globalIndex = this.getGlobalImageIndex(img);
             const sizeKB = img.size
                 ? (img.size / 1024).toFixed(1)
                 : ((img.base64.length * 3 / 4) / 1024).toFixed(1);
 
             return `
-                <div class="observation-image-item">
-                    <img src="${img.base64}" 
-                         alt="${img.alt || 'Image'}" 
+                <div class="observation-image-item" data-image-id="${this.escapeHtmlInput(img.id)}">
+                    <img src="${this.escapeHtmlInput(img.base64)}" 
+                         alt="${this.escapeHtmlInput(img.alt || 'Image')}" 
                          class="observation-image-preview"
-                         onclick="window.editor.openImageLightbox('${img.base64.replace(/'/g, "\\'")}')">
+                         onclick="window.editor.openImageLightbox(this.src)">
                     
                     <input type="text" 
                            class="observation-image-caption" 
                            placeholder="Légende..."
-                           value="${img.alt || img.caption || ''}"
-                           onchange="window.editor.updateImageCaption(${globalIndex}, this.value)">
+                           value="${this.escapeHtmlInput(img.alt || img.caption || '')}"
+                           onchange="window.editor.updateImageCaption(this.closest('[data-image-id]').dataset.imageId, this.value)">
                     
                     <button type="button" 
                             class="observation-image-delete" 
-                            onclick="window.editor.removeObservationImage(${observationNumber}, ${globalIndex})">
+                            onclick="window.editor.removeObservationImage(${observationNumber}, this.closest('[data-image-id]').dataset.imageId)">
                         🗑️ Supprimer
                     </button>
                     
@@ -799,13 +807,12 @@ class AuditEditor {
     /**
      * Supprime une image d'une observation
      */
-    removeObservationImage(observationNumber, globalIndex) {
+    removeObservationImage(observationNumber, imageId) {
         if (!confirm('⚠️ Supprimer cette image ?')) return;
 
-        console.log(`🗑️ Suppression image index ${globalIndex} de l'observation ${observationNumber}`);
-
-        if (this.currentData.images && globalIndex >= 0 && globalIndex < this.currentData.images.length) {
-            this.currentData.images.splice(globalIndex, 1);
+        const index = this.findImageIndexById(imageId);
+        if (index !== -1) {
+            this.currentData.images.splice(index, 1);
             this.refreshObservationImages(observationNumber);
         }
     }
@@ -1161,27 +1168,26 @@ class AuditEditor {
         if (!images || images.length === 0) return '';
 
         return images.map((img) => {
-            const globalIndex = this.getGlobalImageIndex(img);
             const sizeKB = img.size
                 ? (img.size / 1024).toFixed(1)
                 : ((img.base64.length * 3 / 4) / 1024).toFixed(1);
 
             return `
-                <div class="ecart-image-item">
-                    <img src="${img.base64}" 
-                         alt="${img.alt || 'Image'}" 
+                <div class="ecart-image-item" data-image-id="${this.escapeHtmlInput(img.id)}">
+                    <img src="${this.escapeHtmlInput(img.base64)}" 
+                         alt="${this.escapeHtmlInput(img.alt || 'Image')}" 
                          class="ecart-image-preview"
-                         onclick="window.editor.openImageLightbox('${img.base64.replace(/'/g, "\\'")}')">
+                         onclick="window.editor.openImageLightbox(this.src)">
                     
                     <input type="text" 
                            class="ecart-image-caption" 
                            placeholder="Légende..."
-                           value="${img.alt || img.caption || ''}"
-                           onchange="window.editor.updateImageCaption(${globalIndex}, this.value)">
+                           value="${this.escapeHtmlInput(img.alt || img.caption || '')}"
+                           onchange="window.editor.updateImageCaption(this.closest('[data-image-id]').dataset.imageId, this.value)">
                     
                     <button type="button" 
                             class="ecart-image-delete" 
-                            onclick="window.editor.removeEcartImage(${ecartNumber}, ${globalIndex})">
+                            onclick="window.editor.removeEcartImage(${ecartNumber}, this.closest('[data-image-id]').dataset.imageId)">
                         🗑️ Supprimer
                     </button>
                     
@@ -1192,11 +1198,24 @@ class AuditEditor {
     }
 
     /**
-     * Trouve l'index global d'une image
+     * Trouve l'index d'une image par son id
      */
-    getGlobalImageIndex(image) {
+    findImageIndexById(imageId) {
         if (!this.currentData || !this.currentData.images) return -1;
-        return this.currentData.images.findIndex(img => img.id === image.id);
+        return this.currentData.images.findIndex(img => img.id === imageId);
+    }
+
+    /**
+     * Garantit un id unique par image (JSON externes : id absent ou dupliqué)
+     */
+    ensureImageIds(images) {
+        const seen = new Set();
+        images.forEach(img => {
+            if (!img.id || seen.has(img.id)) {
+                img.id = `img-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+            }
+            seen.add(img.id);
+        });
     }
 
     /**
@@ -1274,13 +1293,12 @@ class AuditEditor {
     /**
      * Supprime une image d'un écart
      */
-    removeEcartImage(ecartNumber, globalIndex) {
+    removeEcartImage(ecartNumber, imageId) {
         if (!confirm('⚠️ Supprimer cette image ?')) return;
 
-        console.log(`🗑️ Suppression image index ${globalIndex} de l'écart ${ecartNumber}`);
-
-        if (this.currentData.images && globalIndex >= 0 && globalIndex < this.currentData.images.length) {
-            this.currentData.images.splice(globalIndex, 1);
+        const index = this.findImageIndexById(imageId);
+        if (index !== -1) {
+            this.currentData.images.splice(index, 1);
             this.refreshEcartImages(ecartNumber);
         }
     }
@@ -1288,11 +1306,12 @@ class AuditEditor {
     /**
      * Met à jour la légende d'une image
      */
-    updateImageCaption(globalIndex, caption) {
-        if (this.currentData.images && this.currentData.images[globalIndex]) {
-            this.currentData.images[globalIndex].alt = caption;
-            this.currentData.images[globalIndex].caption = caption;
-            console.log(`✏️ Légende mise à jour pour image ${globalIndex}:`, caption);
+    updateImageCaption(imageId, caption) {
+        const index = this.findImageIndexById(imageId);
+        if (index !== -1) {
+            this.currentData.images[index].alt = caption;
+            this.currentData.images[index].caption = caption;
+            console.log(`✏️ Légende mise à jour pour image ${imageId}:`, caption);
         }
     }
 
@@ -1386,6 +1405,13 @@ class AuditEditor {
                     lightbox.classList.remove('active');
                 }
             });
+
+            // Enregistré une seule fois (avant : un listener de plus à chaque ouverture)
+            lightbox.addEventListener('transitionend', (e) => {
+                if (e.propertyName === 'opacity' && !lightbox.classList.contains('active')) {
+                    document.body.style.overflow = '';
+                }
+            });
         }
 
         const img = lightbox.querySelector('.image-lightbox-img');
@@ -1402,12 +1428,6 @@ class AuditEditor {
             });
         };
         preloadImg.src = base64;
-
-        lightbox.addEventListener('transitionend', (e) => {
-            if (e.propertyName === 'opacity' && !lightbox.classList.contains('active')) {
-                document.body.style.overflow = '';
-            }
-        });
     }
 
     /**
