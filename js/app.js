@@ -36,6 +36,11 @@ class AuditConverterApp {
             this.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
         }
 
+        const pickFileBtn = document.getElementById('pickFile');
+        if (pickFileBtn && this.fileInput) {
+            pickFileBtn.addEventListener('click', () => this.fileInput.click());
+        }
+
         if (this.uploadArea) {
             this.uploadArea.addEventListener('dragover', (e) => {
                 e.preventDefault();
@@ -71,6 +76,8 @@ class AuditConverterApp {
 
     handleFileSelect(event) {
         const file = event.target.files[0];
+        // Vidé tout de suite : re-sélectionner le même fichier redéclenche l'import
+        event.target.value = '';
         if (file) {
             this.processFile(file);
         }
@@ -294,6 +301,9 @@ class AuditConverterApp {
             ? `Terminé ! Images : ${ImageCompressor.formatBytes(stats.before)} → ${ImageCompressor.formatBytes(stats.after)}`
             : 'Terminé !';
         this.showProgress(message, 100);
+        this.importSummary = stats.compressed > 0
+            ? `Photos optimisées : ${ImageCompressor.formatBytes(stats.before)} → ${ImageCompressor.formatBytes(stats.after)}`
+            : null;
         console.log(`🗜️ ${stats.compressed}/${stats.total} image(s) compressée(s) :`,
             ImageCompressor.formatBytes(stats.before), '→', ImageCompressor.formatBytes(stats.after));
     }
@@ -546,6 +556,8 @@ class AuditConverterApp {
     }
 
     showProgress(message, percent) {
+        // La progression remplace le contenu de la zone de dépôt : retour à l'endroit de l'action
+        if (this.uploadArea) this.uploadArea.classList.add('is-busy');
         if (this.progressSection) this.progressSection.style.display = 'block';
         if (this.progressText) this.progressText.textContent = message;
         if (this.progressFill) this.progressFill.style.width = `${percent}%`;
@@ -557,19 +569,16 @@ class AuditConverterApp {
         if (window.editor) {
             window.editor.currentData = JSON.parse(JSON.stringify(this.currentData));
             window.editor.populateForm(window.editor.currentData);
-
-            if (window.editor.form) {
-                window.editor.form.style.display = 'block';
-            }
+            window.editor.showForm();
 
             const editTabBtn = document.querySelector('[data-tab="edit"]');
             if (editTabBtn) editTabBtn.click();
+            window.scrollTo({ top: 0 });
 
-            setTimeout(() => {
-                if (window.editor.form) {
-                    window.editor.form.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-            }, 300);
+            // Zone de dépôt prête pour un autre import ; gain affiché en notification
+            this.hideAllSections();
+            showToast(this.importSummary ? `Rapport importé. ${this.importSummary}` : 'Rapport importé.');
+            this.importSummary = null;
 
             console.log('✅ Éditeur chargé avec les données importées');
         } else {
@@ -629,6 +638,7 @@ class AuditConverterApp {
     }
 
     hideAllSections() {
+        if (this.uploadArea) this.uploadArea.classList.remove('is-busy');
         if (this.progressSection) this.progressSection.style.display = 'none';
         if (this.jsonSection) this.jsonSection.style.display = 'none';
         if (this.errorSection) this.errorSection.style.display = 'none';
@@ -649,6 +659,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const tabBtns = document.querySelectorAll('.tab-btn');
     const tabContents = document.querySelectorAll('.tab-content');
+    const STEP_ORDER = ['upload', 'edit', 'preview'];
+
+    // Stepper : étape courante, étapes passées cochées
+    function updateStepper(currentTab) {
+        const currentIndex = STEP_ORDER.indexOf(currentTab);
+        tabBtns.forEach(b => {
+            const index = STEP_ORDER.indexOf(b.dataset.tab);
+            b.classList.toggle('is-current', index === currentIndex);
+            b.classList.toggle('is-done', index < currentIndex);
+            if (index === currentIndex) b.setAttribute('aria-current', 'step');
+            else b.removeAttribute('aria-current');
+        });
+
+        // Aperçu : état vide tant qu'aucun rapport n'a été généré
+        const hasPreview = !!window.currentEditedHTML;
+        const previewEmpty = document.getElementById('previewEmpty');
+        const previewFrame = document.getElementById('previewFrame');
+        const downloadBtn = document.getElementById('downloadHtmlFinal');
+        if (previewEmpty) previewEmpty.hidden = hasPreview;
+        if (previewFrame) previewFrame.hidden = !hasPreview;
+        if (downloadBtn) downloadBtn.disabled = !hasPreview;
+    }
 
     tabBtns.forEach(btn => {
         btn.addEventListener('click', () => {
@@ -661,8 +693,29 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.classList.add('active');
             const targetContent = document.getElementById(`tab-${targetTab}`);
             if (targetContent) targetContent.classList.add('active');
+            updateStepper(targetTab);
         });
     });
+    updateStepper('upload');
+
+    const goToTab = (tab) => {
+        const tabBtn = document.querySelector(`.tab-btn[data-tab="${tab}"]`);
+        if (tabBtn) tabBtn.click();
+        window.scrollTo({ top: 0 });
+    };
+
+    document.querySelectorAll('[data-goto]').forEach(el => {
+        el.addEventListener('click', () => goToTab(el.dataset.goto));
+    });
+
+    // « Créer un rapport vide » depuis l'étape Import
+    const startBlankBtn = document.getElementById('startBlank');
+    if (startBlankBtn) {
+        startBlankBtn.addEventListener('click', () => {
+            goToTab('edit');
+            if (window.editor) window.editor.createNewReport();
+        });
+    }
 
     // Bouton "Éditer les données"
     const editDataBtn = document.getElementById('editData');
@@ -674,7 +727,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 window.editor.currentData = JSON.parse(JSON.stringify(window.app.currentData));
                 window.editor.populateForm(window.editor.currentData);
 
-                if (window.editor.form) window.editor.form.style.display = 'block';
+                window.editor.showForm();
 
                 const editTabBtn = document.querySelector('[data-tab="edit"]');
                 if (editTabBtn) editTabBtn.click();
@@ -750,6 +803,7 @@ document.addEventListener('DOMContentLoaded', () => {
             window.currentEditedHTML = html;
             window.currentEditedData = data;
 
+            showToast(`Rapport téléchargé : ${fileName}`);
             console.log(`✅ HTML téléchargé : ${fileName}`);
         });
     }
@@ -766,20 +820,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (themeToggleBtn) {
         themeToggleBtn.addEventListener('click', () => {
+            // Thème clair par défaut ; sombre via data-theme="dark"
             const html = document.documentElement;
-            const isLight = html.getAttribute('data-theme') === 'light';
+            const toDark = html.getAttribute('data-theme') !== 'dark';
 
-            if (isLight) {
-                // Passer en dark
-                html.removeAttribute('data-theme');
-                localStorage.setItem('generator-theme', 'dark');
-                console.log('🌙 Thème sombre activé');
-            } else {
-                // Passer en light
-                html.setAttribute('data-theme', 'light');
-                localStorage.setItem('generator-theme', 'light');
-                console.log('☀️ Thème clair activé');
-            }
+            if (toDark) html.setAttribute('data-theme', 'dark');
+            else html.removeAttribute('data-theme');
+
+            try {
+                localStorage.setItem('generator-theme', toDark ? 'dark' : 'light');
+            } catch (e) { /* préférence non mémorisée */ }
         });
 
         console.log('✅ Toggle thème initialisé');
