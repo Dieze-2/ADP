@@ -392,14 +392,15 @@ class AuditEditor {
         for (let file of files) {
             try {
                 const processedFile = await this.convertHeicIfNeeded(file);
-                const base64 = await this.fileToBase64(processedFile);
+                // Redimensionnée + recompressée (une photo de 4 Mo passe à ~300 Ko)
+                const compressed = await ImageCompressor.compressFile(processedFile);
 
                 const imageData = {
                     id: `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                    base64: base64,
+                    base64: compressed.base64,
                     alt: file.name.replace(/\.[^/.]+$/, ''),
-                    contentType: processedFile.type,
-                    size: processedFile.size,
+                    contentType: compressed.contentType,
+                    size: compressed.size,
                     pointFortNumber: pointFortNumber,
                     caption: ''
                 };
@@ -762,14 +763,15 @@ class AuditEditor {
                 // ✅ HEIC : Conversion automatique si nécessaire
                 const processedFile = await this.convertHeicIfNeeded(file);
 
-                const base64 = await this.fileToBase64(processedFile);
+                // Redimensionnée + recompressée (une photo de 4 Mo passe à ~300 Ko)
+                const compressed = await ImageCompressor.compressFile(processedFile);
 
                 const imageData = {
                     id: `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                    base64: base64,
+                    base64: compressed.base64,
                     alt: file.name.replace(/\.[^/.]+$/, ''),
-                    contentType: processedFile.type,
-                    size: processedFile.size,
+                    contentType: compressed.contentType,
+                    size: compressed.size,
                     observationNumber: observationNumber,
                     caption: ''
                 };
@@ -1119,6 +1121,9 @@ class AuditEditor {
 
                 console.log('✅ JSON valide, chargement dans l\'éditeur...');
 
+                // Rapports existants : photos alourdies avant la compression automatique
+                await ImageCompressor.compressAll(data.images);
+
                 // Charger dans l'éditeur
                 this.currentData = data;
                 if (!Array.isArray(this.currentData.pointsForts)) this.currentData.pointsForts = [];
@@ -1248,14 +1253,15 @@ class AuditEditor {
                 // ✅ HEIC : Conversion automatique si nécessaire
                 const processedFile = await this.convertHeicIfNeeded(file);
 
-                const base64 = await this.fileToBase64(processedFile);
+                // Redimensionnée + recompressée (une photo de 4 Mo passe à ~300 Ko)
+                const compressed = await ImageCompressor.compressFile(processedFile);
 
                 const imageData = {
                     id: `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                    base64: base64,
+                    base64: compressed.base64,
                     alt: file.name.replace(/\.[^/.]+$/, ''),
-                    contentType: processedFile.type,
-                    size: processedFile.size,
+                    contentType: compressed.contentType,
+                    size: compressed.size,
                     ecartNumber: ecartNumber,
                     caption: ''
                 };
@@ -1313,18 +1319,6 @@ class AuditEditor {
             this.currentData.images[index].caption = caption;
             console.log(`✏️ Légende mise à jour pour image ${imageId}:`, caption);
         }
-    }
-
-    /**
-     * ✅ HEIC : Convertit un fichier en Base64
-     */
-    fileToBase64(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = (e) => resolve(e.target.result);
-            reader.onerror = (e) => reject(e);
-            reader.readAsDataURL(file);
-        });
     }
 
     /**
@@ -1597,7 +1591,8 @@ async processClipboardImage(file, type, number) {
     try {
         // Conversion HEIC si nécessaire (peu probable depuis presse-papier mais par sécurité)
         const processedFile = await this.convertHeicIfNeeded(file);
-        const base64 = await this.fileToBase64(processedFile);
+        // Redimensionnée + recompressée (une photo de 4 Mo passe à ~300 Ko)
+        const compressed = await ImageCompressor.compressFile(processedFile);
 
         // Nom automatique avec horodatage
         const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
@@ -1605,10 +1600,10 @@ async processClipboardImage(file, type, number) {
 
         const imageData = {
             id: `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            base64: base64,
+            base64: compressed.base64,
             alt: fileName,
-            contentType: processedFile.type || 'image/png',
-            size: processedFile.size,
+            contentType: compressed.contentType,
+            size: compressed.size,
             caption: ''
         };
 

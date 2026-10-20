@@ -119,8 +119,7 @@ class AuditConverterApp {
 
         this.showProgress('Validation des données...', 60);
         this.validator.validate(this.currentData);
-        this.showProgress('Finalisation...', 80);
-        this.showProgress('Terminé!', 100);
+        await this.compressImages();
 
         setTimeout(() => { this.goToEditor(); }, 500);
     }
@@ -132,8 +131,7 @@ class AuditConverterApp {
         this.currentData = this.parseHtmlReport(htmlContent);
         this.showProgress('Validation des données...', 60);
         this.validator.validate(this.currentData);
-        this.showProgress('Finalisation...', 80);
-        this.showProgress('Terminé!', 100);
+        await this.compressImages();
 
         setTimeout(() => { this.goToEditor(); }, 500);
     }
@@ -160,8 +158,7 @@ class AuditConverterApp {
             this.showProgress('Validation des données...', 60);
             this.currentData = this.normalizeJsonData(parsedData);
             this.validator.validate(this.currentData);
-            this.showProgress('Finalisation...', 80);
-            this.showProgress('Terminé!', 100);
+            await this.compressImages();
 
             console.log('✅ JSON chargé avec succès');
             console.log('  ✅ Points forts:', this.currentData.pointsForts?.length || 0);
@@ -273,6 +270,29 @@ class AuditConverterApp {
 
         console.log('✅ Données normalisées');
         return normalized;
+    }
+
+    /**
+     * Compresse les images importées (Word, rapports et JSON existants)
+     * et affiche le gain obtenu
+     */
+    async compressImages() {
+        const images = this.currentData && this.currentData.images;
+        if (!Array.isArray(images) || images.length === 0) {
+            this.showProgress('Terminé !', 100);
+            return;
+        }
+
+        const stats = await ImageCompressor.compressAll(images, (done, total) => {
+            this.showProgress(`Optimisation des images (${done}/${total})...`, 70 + Math.round(30 * done / total));
+        });
+
+        const message = stats.compressed > 0
+            ? `Terminé ! Images : ${ImageCompressor.formatBytes(stats.before)} → ${ImageCompressor.formatBytes(stats.after)}`
+            : 'Terminé !';
+        this.showProgress(message, 100);
+        console.log(`🗜️ ${stats.compressed}/${stats.total} image(s) compressée(s) :`,
+            ImageCompressor.formatBytes(stats.before), '→', ImageCompressor.formatBytes(stats.after));
     }
 
     readFileAsText(file) {
