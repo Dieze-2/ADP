@@ -37,12 +37,15 @@ class AuditValidator {
     /**
      * Valide les métadonnées
      */
-    validateMetadata(metadata) {
+    validateMetadata(metadata = {}) {
+        // String() : un JSON peut contenir "auditNumber": 2024 (nombre) -> .trim() plantait
+        const isBlank = (value) => String(value ?? '').trim() === '';
+
         // Champs obligatoires
         const requiredFields = ['auditNumber', 'team', 'period', 'reportDate'];
 
         for (const field of requiredFields) {
-            if (!metadata[field] || metadata[field].trim() === '') {
+            if (isBlank(metadata[field])) {
                 this.errors.push(`Métadonnée manquante: ${field}`);
             }
         }
@@ -51,7 +54,7 @@ class AuditValidator {
         const recommendedFields = ['objective', 'perimeter'];
 
         for (const field of recommendedFields) {
-            if (!metadata[field] || metadata[field].trim() === '') {
+            if (isBlank(metadata[field])) {
                 this.warnings.push(`Métadonnée recommandée manquante: ${field}`);
             }
         }
@@ -59,7 +62,7 @@ class AuditValidator {
         // Valider le format de la date
         if (metadata.reportDate) {
             const datePattern = /\d{2}\.\d{2}\.\d{4}/;
-            if (!datePattern.test(metadata.reportDate)) {
+            if (!datePattern.test(String(metadata.reportDate))) {
                 this.warnings.push(`Format de date inhabituel: ${metadata.reportDate}`);
             }
         }
