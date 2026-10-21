@@ -49,6 +49,9 @@ class AuditEditor {
 
         this.RECIPIENTS_STORAGE_KEY = 'generator-plan-action-recipients';
 
+        // Bandeau de la première diapositive (au-dessus du titre)
+        this.DEFAULT_KICKER = 'Audit interne – Secteur Fournitures';
+
         this.DEFAULT_OBJECTIVE =
             "Evaluer les éventuels écarts sur le terrain avec le référentiel du secteur Fournitures et remonter les améliorations potentielles.";
 
@@ -86,6 +89,7 @@ class AuditEditor {
 
         // ✅ Nouveau : prochainesEtapesTexte remplace prochainesEtapes (liste)
         this.formFields = {
+            reportKicker: document.getElementById('reportKicker'),
             auditNumber: document.getElementById('auditNumber'),
             auditTitle: document.getElementById('auditTitle'),
             team: document.getElementById('team'),
@@ -173,6 +177,7 @@ class AuditEditor {
 
         this.currentData = {
             metadata: {
+                kicker: this.DEFAULT_KICKER,
                 auditNumber: '',
                 title: '',
                 team: '',
@@ -235,6 +240,7 @@ class AuditEditor {
         if (!Array.isArray(data.images)) data.images = [];
         this.ensureImageIds(data.images);
 
+        this.formFields.reportKicker.value = data.metadata.kicker || this.DEFAULT_KICKER;
         this.formFields.auditNumber.value = data.metadata.auditNumber || '';
         this.formFields.auditTitle.value = data.metadata.title || '';
         this.formFields.team.value = data.metadata.team || '';
@@ -958,6 +964,7 @@ class AuditEditor {
 
         const data = {
             metadata: {
+                kicker: this.formFields.reportKicker.value.trim(),
                 auditNumber: this.formFields.auditNumber.value.trim(),
                 title: this.formFields.auditTitle.value.trim(),
                 team: this.formFields.team.value.trim(),
