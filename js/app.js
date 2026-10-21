@@ -193,6 +193,7 @@ class AuditConverterApp {
 
         const normalized = {
             metadata: {
+                kicker: data.metadata?.kicker || '',
                 auditNumber: data.metadata?.auditNumber || '',
                 title: data.metadata?.title || '',
                 team: data.metadata?.team || '',
@@ -364,6 +365,9 @@ class AuditConverterApp {
 
         const slide1 = doc.querySelector('#slide-1');
         if (slide1) {
+            const kickerEl = slide1.querySelector('.slide-kicker');
+            if (kickerEl) data.metadata.kicker = kickerEl.textContent.replace(/\s+/g, ' ').trim();
+
             const titleEl = slide1.querySelector('.slide-title');
             if (titleEl) {
                 const titleText = titleEl.textContent.replace(/\s+/g, ' ').trim();

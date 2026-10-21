@@ -2056,7 +2056,7 @@ function generateSlide1(data, total) {
   <section class="slide" id="slide-1" data-slide="1" data-title="Informations">
     <div class="slide-header">
       <div>
-        <div class="slide-kicker">Audit interne – Secteur Fournitures</div>
+        <div class="slide-kicker">${escapeHtmlText(metadata.kicker || 'Audit interne – Secteur Fournitures')}</div>
         <div class="slide-title">Audit ${escapeHtmlText(metadata.auditNumber || 'N/A')}<br>${escapeHtmlText(metadata.title || '')}</div>
       </div>
     </div>
@@ -2713,6 +2713,7 @@ function normalizeAuditDataForEmbed(data) {
 
     const normalized = {
         metadata: {
+            kicker: d.metadata?.kicker || '',
             auditNumber: d.metadata?.auditNumber || '',
             title: d.metadata?.title || '',
             team: d.metadata?.team || '',
