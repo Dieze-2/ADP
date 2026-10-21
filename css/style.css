@@ -247,7 +247,6 @@ kbd { font: 600 13px var(--mono); padding: 1px 6px; border-radius: 6px; backgrou
 .span-8 { grid-column: span 8; }
 .span-9 { grid-column: span 9; }
 .span-12 { grid-column: span 12; }
-.row-2 { grid-row: span 2; }
 .stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 
 .card {
@@ -295,7 +294,6 @@ kbd { font: 600 13px var(--mono); padding: 1px 6px; border-radius: 6px; backgrou
 .btn--danger-text { color: var(--red); }
 .btn--danger-text:hover:not(:disabled) { color: var(--red); background: var(--red-soft); }
 .btn--sm { height: 40px; padding: 0 16px; font-size: 15px; }
-.btn--block { width: 100%; margin-top: 20px; }
 
 .link-btn { color: var(--green-text); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
 
@@ -355,10 +353,6 @@ kbd { font: 600 13px var(--mono); padding: 1px 6px; border-radius: 6px; backgrou
 }
 .alert__text { margin: 0; font-weight: 500; }
 
-.list-rows { list-style: none; margin: 14px 0 0; padding: 0; }
-.list-rows li { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-top: .5px solid var(--hair); font-size: 15px; color: var(--ink-2); }
-.list-rows li:first-child { border-top: 0; }
-.list-rows .chip { flex: none; }
 
 /* =====================================================
    ÉTATS VIDES
@@ -412,6 +406,12 @@ kbd { font: 600 13px var(--mono); padding: 1px 6px; border-radius: 6px; backgrou
 
 .edit-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .section-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.section-header__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Nouveau rapport : bouton calé en bas de la carte */
+.blank-card { display: flex; flex-direction: column; align-items: flex-start; }
+.blank-card .btn { margin-top: auto; }
+.blank-card .caption { margin-bottom: 16px; }
 .section-header .section-title { margin: 0; }
 .section-title { margin: 0 0 16px; font-size: 22px; line-height: 1.25; font-weight: 700; letter-spacing: -.015em; }
 .section-empty { margin: 0; padding: 18px; border-radius: var(--r-sm); text-align: center; font-size: 15px; color: var(--ink-3); background: var(--glass-inset); box-shadow: inset 0 0 0 .5px var(--hair); }
@@ -627,11 +627,14 @@ kbd { font: 600 13px var(--mono); padding: 1px 6px; border-radius: 6px; backgrou
 /* =====================================================
    APERÇU
    ===================================================== */
-.preview-card { display: flex; flex-direction: column; }
+/* L'aperçu déborde de la colonne de 1 240 px pour exploiter la largeur de l'écran */
+.tab-content--wide { margin-inline: calc((min(1760px, 100vw - 48px) - 100%) / -2); }
+.preview-card { display: flex; flex-direction: column; padding: 20px; }
+.preview-card .section-header { padding: 4px 4px 0; }
 .preview-frame {
-    flex: 1;
-    height: calc(100vh - var(--appbar-h) - 190px);
-    min-height: 520px;
+    flex: none;
+    height: calc(100vh - var(--appbar-h) - 120px);
+    min-height: 560px;
     border-radius: 20px;
     overflow: hidden;
     background: #FFFFFF;
@@ -767,10 +770,8 @@ kbd { font: 600 13px var(--mono); padding: 1px 6px; border-radius: 6px; backgrou
     .span-8, .span-9, .span-6, .span-3 { grid-column: span 12; }
     .span-4 { grid-column: span 6; }
     .span-2 { grid-column: span 4; }
-    .row-2 { grid-row: auto; }
     .section-nav { position: static; display: flex; overflow-x: auto; scrollbar-width: none; }
     .section-nav a { white-space: nowrap; }
-    .preview-card + .stack { grid-column: span 12; }
 }
 
 @media (max-width: 720px) {

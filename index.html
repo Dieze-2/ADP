@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Générateur de rapport d'audit</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <link rel="stylesheet" href="css/style.css">
 
     <!-- Thème appliqué avant le premier rendu (clair par défaut) -->
@@ -47,7 +50,7 @@
              ===================================================== -->
         <section id="tab-upload" class="tab-content active" role="tabpanel" aria-labelledby="tabbtn-upload">
             <div class="bento">
-                <div class="card card--lg glass span-8 row-2">
+                <div class="card card--lg glass span-8">
                     <p class="eyebrow">Étape 1 sur 3</p>
                     <h1 class="large-title">Importer un rapport</h1>
                     <p class="lede">Le compte rendu Word, un rapport HTML déjà généré ou un fichier JSON. Écarts, observations et photos sont extraits pour vous.</p>
@@ -82,31 +85,11 @@
                     </div>
                 </div>
 
-                <div class="card glass lift span-4">
+                <div class="card glass lift span-4 blank-card">
                     <p class="eyebrow">Sans fichier</p>
                     <h2 class="title-2">Nouveau rapport</h2>
                     <p class="caption">Partez d'un formulaire vierge, prérempli avec l'objectif habituel.</p>
                     <button type="button" class="btn btn--secondary btn--sm" id="startBlank">Commencer</button>
-                </div>
-
-                <div class="card glass lift span-4">
-                    <p class="eyebrow">Photos</p>
-                    <p class="figure">1 600 <span class="figure__unit">px</span></p>
-                    <p class="caption">Redimensionnées et recompressées à l'import, doublons écartés. Les captures d'écran restent nettes.</p>
-                </div>
-
-                <div class="card glass span-6">
-                    <h2 class="title-2">Formats acceptés</h2>
-                    <ul class="list-rows">
-                        <li><span class="chip">.docx</span>Compte rendu Word : métadonnées, écarts, photos</li>
-                        <li><span class="chip">.html</span>Rapport généré, notes de réunion comprises</li>
-                        <li><span class="chip">.json</span>Données exportées depuis l'outil</li>
-                    </ul>
-                </div>
-
-                <div class="card glass span-6">
-                    <h2 class="title-2">Traitement local</h2>
-                    <p class="caption caption--lg">Tout reste sur ce poste : aucun fichier n'est envoyé sur un serveur, et l'outil fonctionne hors connexion.</p>
                 </div>
             </div>
         </section>
@@ -152,6 +135,11 @@
                     <section class="form-section card card--lg glass" id="sec-infos" aria-labelledby="h-infos">
                         <h2 class="section-title" id="h-infos">Informations</h2>
                         <div class="group">
+                            <div class="form-group">
+                                <label for="reportKicker">Bandeau</label>
+                                <input type="text" id="reportKicker" name="reportKicker" placeholder="Audit interne – Secteur Fournitures">
+                                <small class="field-help">Ligne au-dessus du titre, sur la première diapositive.</small>
+                            </div>
                             <div class="form-group">
                                 <label for="auditNumber">N° d'audit</label>
                                 <input type="text" id="auditNumber" name="auditNumber" placeholder="Ex : 2026-001">
@@ -330,12 +318,15 @@ Renforcer le pilotage de la maintenance préventive MP1 et la traçabilité des 
         <!-- =====================================================
              ÉTAPE 3 : APERÇU
              ===================================================== -->
-        <section id="tab-preview" class="tab-content" role="tabpanel" aria-labelledby="tabbtn-preview">
+        <section id="tab-preview" class="tab-content tab-content--wide" role="tabpanel" aria-labelledby="tabbtn-preview">
             <div class="bento">
-                <div class="card card--lg glass span-8 preview-card">
+                <div class="card glass span-12 preview-card">
                     <div class="section-header">
                         <h1 class="large-title large-title--sm">Aperçu du rapport</h1>
-                        <button type="button" id="backToEdit" class="btn btn--ghost btn--sm">Retour à l'édition</button>
+                        <div class="section-header__actions">
+                            <button type="button" id="backToEdit" class="btn btn--ghost btn--sm">Retour à l'édition</button>
+                            <button type="button" id="downloadHtmlFinal" class="btn btn--primary btn--sm">Télécharger le HTML</button>
+                        </div>
                     </div>
                     <div class="empty-state empty-state--inline" id="previewEmpty">
                         <h2 class="title-2">Aucun aperçu</h2>
@@ -346,25 +337,22 @@ Renforcer le pilotage de la maintenance préventive MP1 et la traçabilité des 
                     </div>
                 </div>
 
-                <div class="stack span-4">
-                    <div class="card card--lg glass">
-                        <p class="eyebrow">Prêt à partager</p>
-                        <p class="figure"><span id="previewSize">–</span> <span class="figure__unit">Ko</span></p>
-                        <dl class="kv">
-                            <div><dt>Écarts</dt><dd id="previewEcarts">–</dd></div>
-                            <div><dt>Photos</dt><dd id="previewPhotos">–</dd></div>
-                            <div><dt>Hors ligne</dt><dd class="is-ok">Oui</dd></div>
-                        </dl>
-                        <button type="button" id="downloadHtmlFinal" class="btn btn--primary btn--block">Télécharger le HTML</button>
-                    </div>
-                    <div class="card glass">
-                        <h2 class="title-2">En réunion</h2>
-                        <p class="caption caption--lg">Saisissez le plan d'action directement dans le rapport, puis enregistrez avec <kbd>Ctrl</kbd> + <kbd>S</kbd>. Un brouillon de secours reste dans le navigateur.</p>
-                    </div>
-                    <div class="card glass">
-                        <h2 class="title-2">Destinataires</h2>
-                        <ul class="addr-list" id="previewRecipients"><li class="caption">Aucun destinataire.</li></ul>
-                    </div>
+                <div class="card glass span-4">
+                    <p class="eyebrow">Prêt à partager</p>
+                    <p class="figure"><span id="previewSize">–</span> <span class="figure__unit">Ko</span></p>
+                    <dl class="kv">
+                        <div><dt>Écarts</dt><dd id="previewEcarts">–</dd></div>
+                        <div><dt>Photos</dt><dd id="previewPhotos">–</dd></div>
+                        <div><dt>Hors ligne</dt><dd class="is-ok">Oui</dd></div>
+                    </dl>
+                </div>
+                <div class="card glass span-4">
+                    <h2 class="title-2">En réunion</h2>
+                    <p class="caption caption--lg">Saisissez le plan d'action directement dans le rapport, puis enregistrez avec <kbd>Ctrl</kbd> + <kbd>S</kbd>. Un brouillon de secours reste dans le navigateur.</p>
+                </div>
+                <div class="card glass span-4">
+                    <h2 class="title-2">Destinataires</h2>
+                    <ul class="addr-list" id="previewRecipients"><li class="caption">Aucun destinataire.</li></ul>
                 </div>
             </div>
         </section>
