@@ -70,7 +70,8 @@ function distributeImages(images, pointFortCount, ecartCount, observationCount) 
 }
 
 
-
+// Favicon du rapport (copie de favicon.svg en data URI : le rapport reste autonome)
+const REPORT_FAVICON = "data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Cdefs%3E%3ClinearGradient id=%22g%22 x1=%220%22 y1=%220%22 x2=%22.35%22 y2=%221%22%3E%3Cstop offset=%220%22 stop-color=%22%230A7A4C%22/%3E%3Cstop offset=%221%22 stop-color=%22%23004D2E%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width=%2264%22 height=%2264%22 rx=%2215%22 fill=%22url(%23g)%22/%3E%3Crect x=%22.75%22 y=%22.75%22 width=%2262.5%22 height=%2262.5%22 rx=%2214.25%22 fill=%22none%22 stroke=%22%23fff%22 stroke-opacity=%22.22%22 stroke-width=%221.5%22/%3E%3Cg fill=%22none%22 stroke=%22%23fff%22 stroke-width=%224.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Crect x=%2218%22 y=%2212%22 width=%2228%22 height=%2240%22 rx=%227%22/%3E%3Cpath d=%22m25 32 5 5 9-10%22/%3E%3C/g%3E%3C/svg%3E";
 
 /**
  * Fonction principale : génère le rapport HTML complet
@@ -114,6 +115,7 @@ function generateAuditReport(data) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Audit ${escapeHtmlText(metadata.auditNumber || '')} – ${escapeHtmlText(metadata.title || '')}</title>
+    <link rel="icon" href="${REPORT_FAVICON}">
     ${getStyles()}
 </head>
 <body>
